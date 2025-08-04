@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 from Model.Model import * 
 import plotly.express as px
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution, save_simu_result
-from Analysis.Fountain_analyzer import FT_Analyzer_Simplified
-from Encode.DNAFountain import *
 from Encode.Helper_Functions import *
 pio.templates.default = "plotly_white"
 import Model.config as config
@@ -15,6 +13,7 @@ import glob
 import streamlit as stq
 import subprocess
 import numpy as np
+import json
 import matlab.engine
 import matplotlib.pyplot as plt
 
@@ -27,10 +26,12 @@ def select_image():
 
     # Extract file name and suffix
     file_name, suffix = uploaded_file.name.split('.')
-    in_file_name = file_name + '.' + suffix
+
+    # Get absolute path of the uploaded file
+    abs_file_path = os.path.abspath(uploaded_file.name)
 
     # Get absolute directory for DNA library
-    abs_dir = os.path.dirname(os.path.abspath(uploaded_file.name))
+    abs_dir = os.path.dirname(abs_file_path)
     dna_lib_dir = os.path.join(abs_dir, 'DNA_Library')
     os.makedirs(dna_lib_dir, exist_ok=True)
 
@@ -39,10 +40,9 @@ def select_image():
     out_dna_name = os.path.join(dna_lib_dir, 'simu_' + file_name + '.dna')
     out_file_name = os.path.join(dna_lib_dir, file_name + '_re.' + suffix)
 
-    print('已载入文件：', in_file_name)
     print('DNA 库路径为:', dna_lib_dir)
     print('输出文件路径为：', out_file_name)
-    return in_file_name, file_name, suffix, in_dna_name, out_dna_name, out_file_name
+    return abs_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name
 
 # ---------------------------- Choosing parameters ---------------------------- # 
 
@@ -91,87 +91,144 @@ else:
     arg.seq_TM = config.TM_NNP
 
 # ------------- file path--------------- #
-abs_dir  = "D:\DeSP-main"
-dna_lib_dir = os.path.join(abs_dir, 'DNA_Library')
-
-
+abs_dir  = "D:/COPDS-main/"
+dna_lib_dir = abs_dir + 'DNA_Library/'
+in_file_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
+in_file_name= "Jnu_test.jpg"
+file_name = "Jnu_test"
+suffix = "jpg"
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
 # Create the DNA_Library directory if it doesn't exist
 os.makedirs(dna_lib_dir, exist_ok=True)
 # File uploader for selecting images
-in_file_name,file_name, suffix, in_dna_name, out_dna_name, out_file_name = select_image()
-# -------------------------- encoding ------------------------------------ #
-st.header('DNA-D2S: a systematic error simulation Model for DNA Data Storage channel')
-st.markdown('In this demonstrative web app, you will encode lena.jpg to DNA with DNA fountain code,\
-     run the simulation process to see how errors are generated and passed through different stages,\
-      and optimize encoding parameters according to the noise structures of the channel.')
-st.markdown('You can assign parameters of DNA data storage channel and fountain code in the sidebar.\
-    Play with different combinations of parameters to see how the noise structures and optimal encoding designs are influenced.') 
+# in_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name = select_image()
 
 
-st.header('Encoding the file into DNA')
-if suffix in ['jpg','png']:
-    st.image(in_file_name, width = 200)
+# =====================Segmentation==================== #
+st.subheader('Segmentation')
 
-
-data,pad = preprocess(in_file_name,int(chunk_size/8))
+data,pad = preprocess(in_file_path,int(chunk_size/8))
 'Images loaded and split into ', len(data), ' data chunks.'
 
 # Save segmentation configuration for later reconstruction
-# Add the suffix of the image file name to label the .txt file for multiple image storage
-segmentation_config_path = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\Segmentation_config_{file_name}.txt"
-with open(segmentation_config_path, "w") as f:
-    f.write(f"pad={pad}\n")
-    f.write(f"chunk_num={len(data)}\n")
+def save_config(in_file_name, chunk_num, pad):
+    '''
+    Save the segmentation configuration to a file in JSON format.
+    The configuration includes the number of chunks and padding information.
+    input_file_name: Name of the stored image file
+    chunk_num: Number of chunks after segmentation
+    pad: Padding size (in bytes) for the last chunk
+    '''
+    config_path = f"./config/config.json"
+    # Read existing config if it exists
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config_data = json.load(f)
+            except json.JSONDecodeError:
+                config_data = {}
+    else:
+        config_data = {}
+    # Update config with current image info
+    config_data[in_file_name] = {"chunk_num": chunk_num, "pad": pad}
 
+    # Write back to config file in JSON format
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+save_config (in_file_name, len(data), pad)
+
+# ==================Binary to bits==================#
 # bytes to bits
 data_temp = []
 for chunk in data:
     data_temp.append(bytes2bits(chunk))
 data = data_temp
-# ==================Segmentation==================#
-# Split data into pools of size k_0 (1000), pad the last pool if needed
-data_pools = []
-pool_size = k_0
-for i in range(0, len(data), pool_size):
-    pool = data[i:i+pool_size]
-    # If last pool is smaller than pool_size, pad with random chunks
-    if len(pool) < pool_size:
-        chunk_len = len(pool[0]) if pool else chunk_size
-        for _ in range(pool_size - len(pool)):
-            random_bits = ''.join(random.choice('01') for _ in range(chunk_len))
-            pool.append(random_bits)
-    data_pools.append(pool)
 
-# Transpose data in each pool for inter-chunk LDPC encoding
-transposed_data_pools = []
-for pool in data_pools:
-    # Each pool is a list of bit strings (chunks)
-    # Transpose: list of strings -> list of strings, each string is the i-th bit of all chunks
-    transposed_pool = [''.join(chunk[i] for chunk in pool) for i in range(len(pool[0]))]
-    transposed_data_pools.append(transposed_pool)
-data_pools = transposed_data_pools     
+# ==================Spliting==================#
+# Split data into pools of size k_0 (1000), pad the last pool if needed
+
+def split_data(data, pool_size):
+    """
+    Split data into pools of size pool_size.
+    If the last pool is smaller than pool_size, pad it with random bits.
+    Input:
+    - data: List of bit strings (each string is a chunk of bits)
+    - pool_size: Size of each pool
+    Output:
+    - data_pools: List of pools, each pool is a list of bit strings
+    """
+    data_pools = []
+    for i in range(0, len(data), pool_size):
+        pool = data[i:i+pool_size]
+        # If last pool is smaller than pool_size, pad with random bits
+        if len(pool) < pool_size:
+            chunk_len = len(pool[0]) if pool else chunk_size
+            for _ in range(pool_size - len(pool)):
+                random_bits = ''.join(random.choice('01') for _ in range(chunk_len))
+                pool.append(random_bits)
+        data_pools.append(pool)
+    return data_pools
+data_pools = split_data(data, k_0)
+'Data is divided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'
+
 # 'Datas is devided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'    
 # Prepare input file for the encoder
-for pool_idx, pool in enumerate(data_pools):
-    input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_input_{pool_idx}.txt"
-    with open(input_file, "w") as f:
-        for chunk in pool:
-            f.write(chunk + "\n")
-# ==================Encoding==================#
+# for pool_idx, pool in enumerate(data_pools):
+#     input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_input_{pool_idx}.txt"
+#     with open(input_file, "w") as f:
+#         for chunk in pool:
+#             f.write(chunk + "\n")
+
+'''
+# =================================Encoding===================================#
 # LDPC encode
 'LDPC encoding...'
-# Path to your LDPC encoder executable and H matrix
-ldpc_encoder_exe = "D:\DeSP-main\App_Simulation_Platform\LDPC_PEG-v2.0.exe"
-h_matrix_path = "D:\DeSP-main\App_Simulation_Platform\config\Hmatrix.txt"
-encoded_data_pools = []
+# Transpose matrix for inter-oligos encoding
+def transpose_data_pools(data_pools):
+    """
+    Transpose the data pools for inter-oligos encoding.
+    Each pool is a list of bit strings (chunks).
+    Transpose to get a list of strings, each string is the i-th bit of all chunks.
+    """
+    transposed_data_pools = []
+    for pool in data_pools:
+        # Each pool is a list of bit strings (chunks)
+        # Transpose: list of strings -> list of strings, each string is the i-th bit of all chunks
+        transposed_pool = [''.join(chunk[i] for chunk in pool) for i in range(len(pool[0]))]
+        transposed_data_pools.append(transposed_pool)
+    return transposed_data_pools
+data_pools = transpose_data_pools(data_pools)
+'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
+
+# Path to the LDPC encoder executable and H matrix
+ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
+h_matrix_path = ".\config\Hmatrix.txt"
+
 mode = "encode"
-for pool_idx, pool in enumerate(data_pools):
-    # Prepare output file path
-    output_file = f"ldpc_output_{pool_idx}.txt"
-    # Show progress and output in Streamlit
-    with st.spinner(f"Encoding pool {pool_idx} with LDPC..."):
+def LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path):
+    """
+    Encode data pools using LDPC encoder.
+    Each pool is processed separately.
+    Input: 
+    - data_pools: List of pools, each pool is a list of bit strings (chunks)
+    - ldpc_encoder_exe: Path to the LDPC encoder executable
+    - mode: Mode for the LDPC encoder ('encode' or 'decode')
+    - h_matrix_path: Path to the H matrix file for LDPC encoding
+    Output:
+    - encoded_data_pools: List of encoded pools, each pool is a list of encoded bit strings
+    """
+    encoded_data_pools = []
+    for pool_idx, pool in enumerate(data_pools):
+        # Prepare input file path
+        input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_input_{pool_idx}.txt"
+        with open(input_file, "w") as f:
+            for chunk in pool:
+                f.write(chunk + "\n")
+        
+        # Call LDPC encoder executable
+        output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_output_{pool_idx}.txt"
         process = subprocess.Popen(
             [
                 ldpc_encoder_exe,
@@ -192,15 +249,16 @@ for pool_idx, pool in enumerate(data_pools):
             status_placeholder.text(line.strip())
         process.stdout.close()
         process.wait()
-    # Read encoded data back
-    encoded_pool = []
-    with open(output_file, "r") as f:
-        for line in f:
-            encoded_pool.append(line.strip())
-    encoded_data_pools.append(encoded_pool)
 
-# Replace data_pools with encoded_data_pools for further processing
-data_pools = encoded_data_pools
+        # Read encoded data back
+        encoded_pool = []
+        with open(output_file, "r") as f:
+            for line in f:
+                encoded_pool.append(line.strip())
+        encoded_data_pools.append(encoded_pool)
+    return encoded_data_pools
+
+data_pools = LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path)
 
 # Transpose data in each pool for inter-chunk LDPC encoding
 transposed_data_pools = []
@@ -609,6 +667,7 @@ st.subheader('Quality Evaluation')
 st.image(out_file_path, width = 300)
 
 # ------------------------ optimizing ----------------------------- #
+'''
 '''
 st.header('Encoding Optimization')
 'The encoding-simulation-decoding process should have been run several times to estimate the distributions.'

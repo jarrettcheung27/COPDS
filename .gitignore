@@ -123,3 +123,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+
+# Data file
+DNA_Library/
+Mid_data/

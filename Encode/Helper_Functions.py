@@ -7,7 +7,7 @@ import numpy as np
 from ordered_set import OrderedSet
 from scipy.spatial.distance import kulczynski1
 
-from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
+# from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
 
 #-----------------segmentation----------------#
@@ -435,25 +435,6 @@ def read_dna_file(file_name):
     dnas = [line.strip() for line in lines]
     return dnas
 #--------------------------BCH---------------------------------#
-def inner_redundancy(P_e, d_seq, n_syn, N_c, r_i, K):
-    """
-    Return the closest effective optimal redundancy allocation r1 and r2 for a given R_i and P_e.
-    Args:
-        P_e: P_e: Overall error probability.
-        d_seq: sequenncing depth.
-        n_syn: synthesis number.
-        N_c: the copy time during PCR.
-        r_i: total redundancy for inner code.
-        K: length of index bits and information bits [index,inf].
-    Returns:
-        r1, r2: Redundancy for the index bits and redundancy for the data bits.
-    """
-    delta_1, r, T = Optimal_Allocation_InnerCode(P_e, d_seq, n_syn, N_c, r_i, K)  # optimal inner code radundancy allocation for the given condition.
-
-    # 从BCH的有效冗余中选取距离理论最优值最近的冗余。
-    r1 = effective_reduandancy(r[0], K[0])
-    r2 = effective_reduandancy(r[1], K[1])
-    return r1, r2
 
 def effective_reduandancy(r_theory, k):
     """
