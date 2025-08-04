@@ -181,14 +181,14 @@ data_pools = split_data(data, k_0)
 #         for chunk in pool:
 #             f.write(chunk + "\n")
 
-'''
+
 # =================================Encoding===================================#
 # LDPC encode
 'LDPC encoding...'
 # Transpose matrix for inter-oligos encoding
-def transpose_data_pools(data_pools):
+def transpose_h2v(data_pools):
     """
-    Transpose the data pools for inter-oligos encoding.
+    Transpose the data pools from horizontal to vertical for inter-oligos encoding.
     Each pool is a list of bit strings (chunks).
     Transpose to get a list of strings, each string is the i-th bit of all chunks.
     """
@@ -199,7 +199,7 @@ def transpose_data_pools(data_pools):
         transposed_pool = [''.join(chunk[i] for chunk in pool) for i in range(len(pool[0]))]
         transposed_data_pools.append(transposed_pool)
     return transposed_data_pools
-data_pools = transpose_data_pools(data_pools)
+data_pools = transpose_h2v(data_pools)
 'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
 
 # Path to the LDPC encoder executable and H matrix
@@ -222,13 +222,13 @@ def LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path):
     encoded_data_pools = []
     for pool_idx, pool in enumerate(data_pools):
         # Prepare input file path
-        input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_input_{pool_idx}.txt"
+        input_file = f"D:/COPDS-main/Mid_data/ldpc_input_{pool_idx}.txt"
         with open(input_file, "w") as f:
             for chunk in pool:
                 f.write(chunk + "\n")
         
         # Call LDPC encoder executable
-        output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_output_{pool_idx}.txt"
+        output_file = f"D:/COPDS-main/Mid_data/ldpc_output_{pool_idx}.txt"
         process = subprocess.Popen(
             [
                 ldpc_encoder_exe,
@@ -260,46 +260,64 @@ def LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path):
 
 data_pools = LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path)
 
-# Transpose data in each pool for inter-chunk LDPC encoding
-transposed_data_pools = []
-# Convert each pool to a 2-D numpy array and transpose for BCH decoding
-transposed_data_pools = []
-for pool in data_pools:
-    # Each pool is a list of bit strings (chunks)
-    # Convert to 2-D numpy array of shape (num_chunks, chunk_length)
-    arr = np.array([list(chunk) for chunk in pool], dtype=np.uint8)
-    # Transpose to shape (chunk_length, num_chunks)
-    transposed_pool = arr.T
-    transposed_data_pools.append(transposed_pool)
-data_pools = transposed_data_pools
+# Convert each pool to a 2-D numpy array and transpose for BCH encoding
+def transpose_v2h(data_pools):
+    """
+    Transpose the data pools from vertical to horizontal for BCH encoding.
+    Each pool is a list of strings, each string is the i-th bit of all chunks.
+    Transpose to get a 2-D numpy array of shape (num_chunks, chunk_length).
+    """
+    transposed_data_pools = []
+    for pool in data_pools:
+        # Each pool is a list of bit strings (chunks)
+        # Convert to 2-D numpy array of shape (num_chunks, chunk_length)
+        arr = np.array([list(chunk) for chunk in pool], dtype=np.uint8)
+        # Transpose to shape (chunk_length, num_chunks)
+        transposed_pool = arr.T
+        transposed_data_pools.append(transposed_pool)
+    return transposed_data_pools
+data_pools = transpose_v2h(data_pools)
 
-# Indexing each chunk in the pool
+# -----------------------Indexing-----------------------
+print("Generating indices...")
 ids = []
 n_0 = len(data_pools[0])  # Number of chunks in the first pool
-k_1 = int(np.ceil(np.log2(n_0)))
-# Generate indices
-for id in range(n_0):
-    ids.append(int_to_binary_array(id, k_1))
-ids = np.array(ids)
+def gen_dix(chunk_num_encoded):
+    """
+    Generate indices for the data pools.
+    Each index is a binary representation of the chunk number.
+    Input:
+    - chunk_num_encoded: Number of chunks in the encoded data
+    Output:
+    - ids: 2-D numpy array of shape (n_0, k_1), where n_0 is the number of chunks and k_1 is the index length
+    """
+    ids = []
+    k_1 = int(np.ceil(np.log2(chunk_num_encoded)))
+    # Generate indices
+    for id in range(n_0):
+        ids.append(int_to_binary_array(id, k_1))
+    ids = np.array(ids)
+    return ids
+ids = gen_dix(n_0)
 
-# BCH encode
+# ----------------------BCH encode----------------------
+print("BCH encoding...")
 encoded_data_pools = []
 matlab_engine = matlab.engine.start_matlab()
 matlab_engine.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
 eng = matlab_engine
 # Encode index by BCH encoder.
-'BCH encoding...'
-'Encoding index part...'
+st.text('BCH encoding...')
 cwr_ids = eng.BCH_Encoder(k_1 + r_1, k_1, n_0, ids)
 
-'Encoding information part...'
 for pool_idx, pool in enumerate(data_pools):
     # Encode information bit by BCH encoder.
     cwr_data = eng.BCH_Encoder(chunk_size + r_2, chunk_size, n_0, pool)
     data_pool = np.concatenate((cwr_ids, cwr_data), axis=1)
     encoded_data_pools.append(data_pool)
 data_pools = encoded_data_pools
-
+input('Debug')
+'''
 #==================Binary to DNA==================#
 st.subheader('Binary to DNA')
 dna_pools = []
