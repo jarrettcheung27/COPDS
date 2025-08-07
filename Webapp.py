@@ -69,18 +69,18 @@ k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 2
 r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 5, max_value = 50, value = 15)
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
 
-# Channel parameter
+# --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
-arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 20)
+arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 30)
 arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.2) / 3 # 3 kinds of substitutions
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
-arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value = 5)
+arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value = 12)
 arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.8)
 
 arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
-arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
+arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 5)
 seq_platform = st.sidebar.selectbox('Sequencing Platform',['Illumina Sequencing','Nanopore'])
 
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
@@ -317,113 +317,54 @@ for data_pool in data_pools:
 dna_pools_dir = os.path.join(dna_lib_dir, 'DNA_pools-' + file_name)
 os.makedirs(dna_pools_dir, exist_ok=True)
 # Save DNA pools to a .dna file, with different key for each pool
-pools_file_name = os.path.join(dna_pools_dir, f'{file_name}_in.dna')
+pools_in_file_name = os.path.join(dna_pools_dir, 'in.dna')
 for idx, dnas in enumerate(dna_pools):
     # Open the file in write mode
-    with open(pools_file_name, "w") as file:
+    with open(pools_in_file_name, "w") as file:
         # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
         json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
-print('DNAs saved to ', pools_file_name)
+print('DNAs saved to ', pools_in_file_name)
 
-# --------------------------- error simulation ---------------------------------- #
+# ================================ DNA simulation Channel ================================ #
 st.header('Error simulation of the DNA data storage channel')
 
 st.subheader('Load Data')
-# Folder selection for DNA pools
+Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
 
-# uploaded_dna_files = st.file_uploader(
-#     "Select one or more DNA pool to simulate", 
-#     type=["dna"], 
-#     accept_multiple_files=True
-# )
-
-in_dnas_pools = dna_pools
-# for uploaded_file in uploaded_dna_files:
-#     dnas = uploaded_file.read().decode("utf-8").splitlines()
-#     in_dnas = [dna.strip() for dna in dnas]
-#     in_dnas_pools.append(in_dnas)
-# st.success(f"Loaded {len(in_dnas_pools)*len(in_dnas)} strands of length {len(in_dnas[0])} nts")
-# Update file name for later processing
-# Remove the suffix after the last "_" (including the "_") in the uploaded file name
-# file_name = uploaded_file.name.rsplit('_', 1)[0]
-
-# 'Sequence ', index, ' will be inspected in detail to show how errors are formed in one sequence.\
-#      You can choose another sequence to inspect by altering the **inspect index** in the sidebar.' 
-# 'Three figures will be depicted for each stage:'
-# '1. Oligo copy number distribution and voting error number distribution.'
-# '2. Error types of sequence ', index
-# '3. Voting results of current copies of sequence ', index
-# 'The simulation process now begins:'
-
-
-# st.subheader('Synthesis')
-'Synthesis...'
-dnas_syn_pools = []
-for in_dnas in in_dnas_pools:
-    SYN = Synthesizer(arg)
-    dnas_syn = SYN(in_dnas)
-    dnas_syn_pools.append(dnas_syn)
-# inspect(dnas_syn,inspect_index = index)
-
-# st.subheader('Decay')
-'Decay...'
-dnas_dec_pools = []
-for dnas_syn in dnas_syn_pools:
-    DEC = Decayer(arg)
-    dnas_dec = DEC(dnas_syn)
-    dnas_dec_pools.append(dnas_dec)
-# inspect(dnas_dec,inspect_index = index)
-
-# st.subheader('PCR')
-'PCR...'
-dnas_pcr_pools = []
-for dnas_dec in dnas_dec_pools:
-    PCR = PCRer(arg = arg)
-    dnas_pcr = PCR(dnas_dec)
-    dnas_pcr_pools.append(dnas_pcr)
-# inspect(dnas_pcr,inspect_index = index)
-
-# st.subheader('Sampling')
-'Sampling...'
-dnas_sam_pools = []
-for dnas_pcr in dnas_pcr_pools:
-    SAM = Sampler(arg = arg)
-    dnas_sam = SAM(dnas_pcr)
-    dnas_sam_pools.append(dnas_sam)
-# inspect(dnas_sam,inspect_index = index)
-
-# st.subheader('Sequencing')
-'Sequencing...'
-dnas_seq_pools = []
-for dnas_sam in dnas_sam_pools:
-    SEQ = Sequencer(arg)
-    dnas_seq = SEQ(dnas_sam)
-    dnas_seq_pools.append(dnas_seq)
-# inspect(dnas_seq,inspect_index = index)
+# Run Simulation for each pool
+out_data_pools = []
+for dnas in dna_pools:
+    out_dnas = Channel(dnas)
+    out_data_pools.append(out_dnas)
 'Simulation completed. '
 
-# Save all dnas_seq_pools in a subfolder named "<image_name>_simu_DNA_pools" under DNA_Library
-simu_dna_pools_dir = os.path.join(dna_lib_dir, f'simu_DNA_pools-{file_name}')
-os.makedirs(simu_dna_pools_dir, exist_ok=True)
-for idx, dnas_seq in enumerate(dnas_seq_pools):
-    pool_file_name = os.path.join(simu_dna_pools_dir, f'simu_{file_name}_{idx}.dna')
-    # Extract every DNA after the simulation  pipeline
-    dnas_sim_result = []
-    for dna_set in dnas_seq:
+
+# -------------------Save Simulation results -------------------
+def extract_dnas(out_dnas):
+    '''
+    Extracts simulated DNA sequences from the output of the DNA channel model.
+    Input:
+    - out_dnas: List of dictionaries, containing error profiles and corresponding DNA sequences.
+    Output:
+    - result: List of simulated DNA sequences.
+    '''
+    result = []
+    for dna_set in out_dnas:
         for dna_error_profile in dna_set['re']:
             for i in range(dna_error_profile[0]):
-                dnas_sim_result.append(dna_error_profile[2])
+                result.append(dna_error_profile[2])
+    return result
 
+pools_out_file_path = os.path.join(dna_pools_dir, 'out.dna')
+for idx, out_dnas in enumerate(out_data_pools):
+    # Extract simulated DNA sequences
+    dnas = extract_dnas(out_dnas)
     # Open the file in write mode
-    with open(pool_file_name, "w") as file:
-        # Write each string in the list to the file
-        for line in dnas_sim_result:
-            file.write(line + "\n")
-'Simulated DNAs saved to ', simu_dna_pools_dir
+    with open(pools_out_file_path, "w") as file:
+        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+        json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
 
-# else:
-#     st.stop()
-#     st.warning("No DNA pool files selected.")
+print('Simulated DNAs saved to ', pools_out_file_path)
 
 
 # --------------------------- decoding ---------------------------- #

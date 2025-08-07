@@ -17,8 +17,8 @@ class DNA_Channel_Model:
             self.Modules = [
                 ('Synthesis',Synthesizer(arg)),
                 ('Decay',Decayer(arg)),
-                # ('PCR',PCRer(arg = arg)),
-                # ('Sample',Sampler(arg = arg)),
+                ('PCR',PCRer(arg = arg)),
+                ('Sample',Sampler(arg = arg)),
                 ('Sequencing',Sequencer(arg))
             ]
 

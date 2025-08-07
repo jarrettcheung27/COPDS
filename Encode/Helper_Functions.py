@@ -101,7 +101,7 @@ def save_config_segmentation(in_file_name, chunk_num, pad):
         config_data = {}
     # Update segmentation config with current image info
 
-    config_data[in_file_name] = {"segmentation": {"chunk_num": chunk_num, "pad": pad}}
+    config_data[in_file_name]["segmentation"] = {"chunk_num": chunk_num, "pad": pad}
 
     # Write back to config file in JSON format
     with open(config_path, "w") as f:
@@ -412,7 +412,7 @@ def save_padding_info_bin2DNA(file_name, is_padding, padding):
     else:
         config_data = {}
     # Update padding info
-    config_data[file_name] = {"Bin2DNA": {"is_padding": is_padding, "padding": padding}}
+    config_data[file_name]["Bin2DNA"] = {"is_padding": is_padding, "padding": padding}
     # Write back to padding info file in JSON format
     with open(config_path, "w") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
