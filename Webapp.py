@@ -97,6 +97,7 @@ in_file_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
 in_file_name= "Jnu_test.jpg"
 file_name = "Jnu_test"
 suffix = "jpg"
+
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
 # Create the DNA_Library directory if it doesn't exist
@@ -111,33 +112,7 @@ st.subheader('Segmentation')
 data,pad = preprocess(in_file_path,int(chunk_size/8))
 'Images loaded and split into ', len(data), ' data chunks.'
 
-# Save segmentation configuration for later reconstruction
-def save_config(in_file_name, chunk_num, pad):
-    '''
-    Save the segmentation configuration to a file in JSON format.
-    The configuration includes the number of chunks and padding information.
-    input_file_name: Name of the stored image file
-    chunk_num: Number of chunks after segmentation
-    pad: Padding size (in bytes) for the last chunk
-    '''
-    config_path = f"./config/config.json"
-    # Read existing config if it exists
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            try:
-                config_data = json.load(f)
-            except json.JSONDecodeError:
-                config_data = {}
-    else:
-        config_data = {}
-    # Update config with current image info
-    config_data[in_file_name] = {"chunk_num": chunk_num, "pad": pad}
-
-    # Write back to config file in JSON format
-    with open(config_path, "w") as f:
-        json.dump(config_data, f, indent=4, ensure_ascii=False)
-
-save_config (in_file_name, len(data), pad)
+save_config_segmentation(in_file_name, len(data), pad)
 
 # ==================Binary to bits==================#
 # bytes to bits
@@ -316,33 +291,39 @@ for pool_idx, pool in enumerate(data_pools):
     data_pool = np.concatenate((cwr_ids, cwr_data), axis=1)
     encoded_data_pools.append(data_pool)
 data_pools = encoded_data_pools
-input('Debug')
-'''
-#==================Binary to DNA==================#
+
+#================================Binary to DNA==================================#
 st.subheader('Binary to DNA')
 dna_pools = []
 total_bits = chunk_size + k_1 + r_1 + r_2
-dna_lenght = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
+dna_length = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
+if (total_bits % 2) != 0:
+    is_padding = True
+else:
+    is_padding = False
+save_padding_info_bin2DNA(in_file_name, is_padding, 0) # Save padding info for binary to DNA conversion
 for data_pool in data_pools:
-    dnas = np.empty(n_0, dtype=f'<U{dna_lenght}') # Create an empty array for DNA sequences
-    for idx in range(n_0):
-        cw = data_pool[idx]
-        bit_str = ''.join(cw.astype(int).astype(str))[:total_bits]
-        dnas[idx] = bin_to_dna(bit_str)
+    dnas = []
+    for binary_codeword in data_pool:
+        if is_padding: # check length of each codeword, if less than dna_length*2, pad with 0s.
+            binary_codeword = np.pad(binary_codeword, (0, dna_length*2 - len(binary_codeword)), 'constant')
+        bit_str = ''.join(binary_codeword.astype(int).astype(str))
+        dna = bin_to_dna(bit_str)
+        dnas.append(dna)
     dna_pools.append(dnas)
 
-
+# --------------- Save DNAs to files ------------------ #
 # Create a subfolder in DNA_Library named as "<image_name> DNA pools"
 dna_pools_dir = os.path.join(dna_lib_dir, 'DNA_pools-' + file_name)
 os.makedirs(dna_pools_dir, exist_ok=True)
-
-# Save each DNA pool to a separate .dna file in the new subfolder with suffix '_n'
+# Save DNA pools to a .dna file, with different key for each pool
+pools_file_name = os.path.join(dna_pools_dir, f'{file_name}_in.dna')
 for idx, dnas in enumerate(dna_pools):
-    pool_file_name = os.path.join(dna_pools_dir, f'{file_name}_{idx}.dna')
-    save_dna_files(dnas, pool_file_name)
-'Data converted to DNA sequences, each sequence is of length ', len(dnas[0]), ' nucleotides.'
-print('DNAs saved to ', dna_pools_dir)
-
+    # Open the file in write mode
+    with open(pools_file_name, "w") as file:
+        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+        json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
+print('DNAs saved to ', pools_file_name)
 
 # --------------------------- error simulation ---------------------------------- #
 st.header('Error simulation of the DNA data storage channel')
@@ -356,95 +337,93 @@ st.subheader('Load Data')
 #     accept_multiple_files=True
 # )
 
-if uploaded_dna_files:
-    in_dnas_pools = []
-    for uploaded_file in uploaded_dna_files:
-        dnas = uploaded_file.read().decode("utf-8").splitlines()
-        in_dnas = [dna.strip() for dna in dnas]
-        in_dnas_pools.append(in_dnas)
-    st.success(f"Loaded {len(in_dnas_pools)*len(in_dnas)} strands of length {len(in_dnas[0])} nts")
-    # Update file name for later processing
-    # Remove the suffix after the last "_" (including the "_") in the uploaded file name
-    file_name = uploaded_file.name.rsplit('_', 1)[0]
+in_dnas_pools = dna_pools
+# for uploaded_file in uploaded_dna_files:
+#     dnas = uploaded_file.read().decode("utf-8").splitlines()
+#     in_dnas = [dna.strip() for dna in dnas]
+#     in_dnas_pools.append(in_dnas)
+# st.success(f"Loaded {len(in_dnas_pools)*len(in_dnas)} strands of length {len(in_dnas[0])} nts")
+# Update file name for later processing
+# Remove the suffix after the last "_" (including the "_") in the uploaded file name
+# file_name = uploaded_file.name.rsplit('_', 1)[0]
 
-    # 'Sequence ', index, ' will be inspected in detail to show how errors are formed in one sequence.\
-    #      You can choose another sequence to inspect by altering the **inspect index** in the sidebar.' 
-    # 'Three figures will be depicted for each stage:'
-    # '1. Oligo copy number distribution and voting error number distribution.'
-    # '2. Error types of sequence ', index
-    # '3. Voting results of current copies of sequence ', index
-    # 'The simulation process now begins:'
+# 'Sequence ', index, ' will be inspected in detail to show how errors are formed in one sequence.\
+#      You can choose another sequence to inspect by altering the **inspect index** in the sidebar.' 
+# 'Three figures will be depicted for each stage:'
+# '1. Oligo copy number distribution and voting error number distribution.'
+# '2. Error types of sequence ', index
+# '3. Voting results of current copies of sequence ', index
+# 'The simulation process now begins:'
 
 
-    # st.subheader('Synthesis')
-    'Synthesis...'
-    dnas_syn_pools = []
-    for in_dnas in in_dnas_pools:
-        SYN = Synthesizer(arg)
-        dnas_syn = SYN(in_dnas)
-        dnas_syn_pools.append(dnas_syn)
-    # inspect(dnas_syn,inspect_index = index)
+# st.subheader('Synthesis')
+'Synthesis...'
+dnas_syn_pools = []
+for in_dnas in in_dnas_pools:
+    SYN = Synthesizer(arg)
+    dnas_syn = SYN(in_dnas)
+    dnas_syn_pools.append(dnas_syn)
+# inspect(dnas_syn,inspect_index = index)
 
-    # st.subheader('Decay')
-    'Decay...'
-    dnas_dec_pools = []
-    for dnas_syn in dnas_syn_pools:
-        DEC = Decayer(arg)
-        dnas_dec = DEC(dnas_syn)
-        dnas_dec_pools.append(dnas_dec)
-    # inspect(dnas_dec,inspect_index = index)
+# st.subheader('Decay')
+'Decay...'
+dnas_dec_pools = []
+for dnas_syn in dnas_syn_pools:
+    DEC = Decayer(arg)
+    dnas_dec = DEC(dnas_syn)
+    dnas_dec_pools.append(dnas_dec)
+# inspect(dnas_dec,inspect_index = index)
 
-    # st.subheader('PCR')
-    'PCR...'
-    dnas_pcr_pools = []
-    for dnas_dec in dnas_dec_pools:
-        PCR = PCRer(arg = arg)
-        dnas_pcr = PCR(dnas_dec)
-        dnas_pcr_pools.append(dnas_pcr)
-    # inspect(dnas_pcr,inspect_index = index)
+# st.subheader('PCR')
+'PCR...'
+dnas_pcr_pools = []
+for dnas_dec in dnas_dec_pools:
+    PCR = PCRer(arg = arg)
+    dnas_pcr = PCR(dnas_dec)
+    dnas_pcr_pools.append(dnas_pcr)
+# inspect(dnas_pcr,inspect_index = index)
 
-    # st.subheader('Sampling')
-    'Sampling...'
-    dnas_sam_pools = []
-    for dnas_pcr in dnas_pcr_pools:
-        SAM = Sampler(arg = arg)
-        dnas_sam = SAM(dnas_pcr)
-        dnas_sam_pools.append(dnas_sam)
-    # inspect(dnas_sam,inspect_index = index)
+# st.subheader('Sampling')
+'Sampling...'
+dnas_sam_pools = []
+for dnas_pcr in dnas_pcr_pools:
+    SAM = Sampler(arg = arg)
+    dnas_sam = SAM(dnas_pcr)
+    dnas_sam_pools.append(dnas_sam)
+# inspect(dnas_sam,inspect_index = index)
 
-    # st.subheader('Sequencing')
-    'Sequencing...'
-    dnas_seq_pools = []
-    for dnas_sam in dnas_sam_pools:
-        SEQ = Sequencer(arg)
-        dnas_seq = SEQ(dnas_sam)
-        dnas_seq_pools.append(dnas_seq)
-    # inspect(dnas_seq,inspect_index = index)
-    'Simulation completed. '
+# st.subheader('Sequencing')
+'Sequencing...'
+dnas_seq_pools = []
+for dnas_sam in dnas_sam_pools:
+    SEQ = Sequencer(arg)
+    dnas_seq = SEQ(dnas_sam)
+    dnas_seq_pools.append(dnas_seq)
+# inspect(dnas_seq,inspect_index = index)
+'Simulation completed. '
 
-    # Save all dnas_seq_pools in a subfolder named "<image_name>_simu_DNA_pools" under DNA_Library
-    simu_dna_pools_dir = os.path.join(dna_lib_dir, f'simu_DNA_pools-{file_name}')
-    os.makedirs(simu_dna_pools_dir, exist_ok=True)
-    for idx, dnas_seq in enumerate(dnas_seq_pools):
-        pool_file_name = os.path.join(simu_dna_pools_dir, f'simu_{file_name}_{idx}.dna')
-        # Extract every DNA after the simulation  pipeline
-        dnas_sim_result = []
-        for dna_set in dnas_seq:
-            for dna_error_profile in dna_set['re']:
-                for i in range(dna_error_profile[0]):
-                    dnas_sim_result.append(dna_error_profile[2])
+# Save all dnas_seq_pools in a subfolder named "<image_name>_simu_DNA_pools" under DNA_Library
+simu_dna_pools_dir = os.path.join(dna_lib_dir, f'simu_DNA_pools-{file_name}')
+os.makedirs(simu_dna_pools_dir, exist_ok=True)
+for idx, dnas_seq in enumerate(dnas_seq_pools):
+    pool_file_name = os.path.join(simu_dna_pools_dir, f'simu_{file_name}_{idx}.dna')
+    # Extract every DNA after the simulation  pipeline
+    dnas_sim_result = []
+    for dna_set in dnas_seq:
+        for dna_error_profile in dna_set['re']:
+            for i in range(dna_error_profile[0]):
+                dnas_sim_result.append(dna_error_profile[2])
 
-        # Open the file in write mode
-        with open(pool_file_name, "w") as file:
-            # Write each string in the list to the file
-            for line in dnas_sim_result:
-                file.write(line + "\n")
-    'Simulated DNAs saved to ', simu_dna_pools_dir
+    # Open the file in write mode
+    with open(pool_file_name, "w") as file:
+        # Write each string in the list to the file
+        for line in dnas_sim_result:
+            file.write(line + "\n")
+'Simulated DNAs saved to ', simu_dna_pools_dir
 
 # else:
 #     st.stop()
 #     st.warning("No DNA pool files selected.")
-
 
 
 # --------------------------- decoding ---------------------------- #
@@ -513,74 +492,86 @@ for out_dnas in out_dnas_pools:
     # 'show data', IDX, INF
     out_data_pools.append((IDX, INF))
 
-'Intra-oligos Decoding...'
-temp = []
-for pool_idx, (IDX, INF) in enumerate(out_data_pools):
-    readsnum = len(out_data_pools[pool_idx][0]) # Number of reads in each pool
+print('BCH Decoding...')
+
+out_data_pools = data_pools
+def BCH_Decoder(k, n, data):
+    readsnum = len(data[0]) # Number of reads in each pool
     # BCH decode index part
     eng = matlab.engine.start_matlab()
     eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
-    cwr_ids = eng.BCH_Decoder(k_1 + r_1, k_1, readsnum, IDX)
+    cwr_ids = eng.BCH_Decoder(n, k, readsnum, data[0])
     # BCH decode information part
     cwr_data = eng.BCH_Decoder(chunk_size + r_2, chunk_size, readsnum, INF)
+    return cwr_ids, cwr_data
+
+# Decode each pool
+temp = []
+for pool_idx, (IDX, INF) in enumerate(out_data_pools):
+    cwr_ids, cwr_data = BCH_Decoder(k_1 + r_1, k_1, (IDX, INF))
     temp.append((cwr_ids, cwr_data))
 # Store the decoded index and information parts
 out_data_pools = temp
 # 'show out_data_pools', out_data_pools
 
-'voting...'
+print('BCH Decoding completed.')
+print('voting...')
 # Cluster the sequences with the same index in each pool
-out_prob_pools = [] # Store the voting results for each pool
-for pool_idx, (IDX, INF) in enumerate(out_data_pools):
-    segments_temp = []
+def voting(IDX, INF, n_0, chunk_size):
     for id in IDX:
-        segment_temp = ''.join(str(int(s)) for s in id[1:])
+        segment_temp = ''.join(str(int(s)) for s in id[1:]) # Convert index bits to string
         segments_temp.append(segment_temp)
-    indices_dec_str = segments_temp
+        indices_dec_str = segments_temp
 
-    segments_temp = []    
-    for data in INF:
-        segment_temp = ''.join(str(int(s)) for s in data[1:])
-        segments_temp.append(segment_temp)
-    inf_bit_dec_str = segments_temp
+        segments_temp = []    
+        for data in INF:
+            segment_temp = ''.join(str(int(s)) for s in data[1:]) # Convert information bits to string
+            segments_temp.append(segment_temp)
+        inf_bit_dec_str = segments_temp
 
+        segments_temp = []
+        for i, inf_bit in enumerate(inf_bit_dec_str):
+            segment_temp = dict(index=0, num=0, data=' ')
+            segment_temp['index'] = int(indices_dec_str[i], 2)
+            segment_temp['data'] = inf_bit
+            segments_temp.append(segment_temp)
+        segments = segments_temp
+        segments_temp = []
+
+        for i in range(n_0):
+            segment_temp = dict(index=0, num=0, data=[])
+            segment_temp['index'] = i
+            for segment in segments:
+                if segment['index'] == i and len(segment['data']) == chunk_size:
+                    segment_temp['num'] += 1
+                    segment_temp['data'].append(segment['data'])
+            segments_temp.append(segment_temp)
+        segments = segments_temp
+
+        voting_result = []
+        for i, segment in enumerate(segments):
+            data = []
+            if segment['num'] > 1:
+                for j in range(chunk_size):
+                    bit_sum = 0
+                    for bit_string in segment['data']:
+                        bit_sum += int(bit_string[j])
+                    data.append(float(bit_sum / segment['num']))
+            elif segment['num'] == 1:
+                data = [float(bit) for bit in segment['data'][0]]
+            else:
+                data = [0.5 for _ in range(chunk_size)]
+            data = np.array(data)
+            voting_result.append(data)
+        voting_result = np.array(voting_result)
+    return voting_result.T
+
+out_prob_pools = [] # Store the voting results for each pool
+for (IDX, INF) in out_data_pools:
     segments_temp = []
-    for i, inf_bit in enumerate(inf_bit_dec_str):
-        segment_temp = dict(index=0, num=0, data=' ')
-        segment_temp['index'] = int(indices_dec_str[i], 2)
-        segment_temp['data'] = inf_bit
-        segments_temp.append(segment_temp)
-    segments = segments_temp
-    segments_temp = []
-
-    for i in range(n_0):
-        segment_temp = dict(index=0, num=0, data=[])
-        segment_temp['index'] = i
-        for segment in segments:
-            if segment['index'] == i and len(segment['data']) == chunk_size:
-                segment_temp['num'] += 1
-                segment_temp['data'].append(segment['data'])
-        segments_temp.append(segment_temp)
-    segments = segments_temp
-
-    voting_result = []
-    for i, segment in enumerate(segments):
-        data = []
-        if segment['num'] > 1:
-            for j in range(chunk_size):
-                bit_sum = 0
-                for bit_string in segment['data']:
-                    bit_sum += int(bit_string[j])
-                data.append(float(bit_sum / segment['num']))
-        elif segment['num'] == 1:
-            data = [float(bit) for bit in segment['data'][0]]
-        else:
-            data = [0.5 for _ in range(chunk_size)]
-        data = np.array(data)
-        voting_result.append(data)
-    voting_result = np.array(voting_result)
-    v_score = voting_result.T
-    out_prob_pools.append(v_score) # Probability of each bit in the voting result, for LDPC decoding
+    voting_result = voting(IDX, INF, n_0, chunk_size)
+    out_prob_pools.append(voting_result) # Probability of each bit in the voting result, for LDPC decoding
+print('Voting completed.')
 
 # Prepare and save the voting results for LDPC decoding
 # v_score shape: (chunk_size, n_0)
@@ -685,7 +676,6 @@ st.subheader('Quality Evaluation')
 st.image(out_file_path, width = 300)
 
 # ------------------------ optimizing ----------------------------- #
-'''
 '''
 st.header('Encoding Optimization')
 'The encoding-simulation-decoding process should have been run several times to estimate the distributions.'

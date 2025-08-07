@@ -1,0 +1,8 @@
+{
+    "Jnu_test.jpg": {
+        "segmentation": {
+            "chunk_num": 705,
+            "pad": 6
+        }
+    }
+}

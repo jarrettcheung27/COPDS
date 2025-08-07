@@ -6,6 +6,8 @@ from reedsolo import RSCodec
 import numpy as np
 from ordered_set import OrderedSet
 from scipy.spatial.distance import kulczynski1
+import os
+import json
 
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
@@ -78,6 +80,32 @@ def load_dna(file_name):
     in_dnas = [dna.split('\n')[0] for dna in dnas]
     return in_dnas
 
+# Save segmentation configuration for later reconstruction
+def save_config_segmentation(in_file_name, chunk_num, pad):
+    '''
+    Save the segmentation configuration to a file in JSON format.
+    The configuration includes the number of chunks and padding information.
+    input_file_name: Name of the stored image file
+    chunk_num: Number of chunks after segmentation
+    pad: Padding size (in bytes) for the last chunk
+    '''
+    config_path = f"./config/config.json"
+    # Read existing config if it exists
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config_data = json.load(f)
+            except json.JSONDecodeError:
+                config_data = {}
+    else:
+        config_data = {}
+    # Update segmentation config with current image info
+
+    config_data[in_file_name] = {"segmentation": {"chunk_num": chunk_num, "pad": pad}}
+
+    # Write back to config file in JSON format
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 #-----------------scanner-------------------#
 class Scanner:
@@ -175,7 +203,6 @@ class Scanner:
             'homo_too_long': rp_too_long
         }
         return dic
-
 
 #------------------xor---------------------#
 
@@ -365,6 +392,30 @@ def int_to_binary_array(number, length):
     binary_array = [float(int(bit)) for bit in padded_binary_str]
     
     return np.array(binary_array)
+# Save padding info of binary to DNA conversion
+def save_padding_info_bin2DNA(file_name, is_padding, padding):
+    '''
+    Save the padding information for binary to DNA conversion.
+    Input:
+    - file_name: Name of the stored image file
+    - is_padding: Boolean indicating if padding was added
+    - padding: padding bits added (0 or 1)
+    '''
+    config_path = f"./config/config.json"
+    # Read existing padding info if it exists
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config_data = json.load(f)
+            except json.JSONDecodeError:
+                config_data = {}
+    else:
+        config_data = {}
+    # Update padding info
+    config_data[file_name] = {"Bin2DNA": {"is_padding": is_padding, "padding": padding}}
+    # Write back to padding info file in JSON format
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 #-----------------------indexing dna chunks------------------------#
 def data_to_dnas(data,index_length = 8):
