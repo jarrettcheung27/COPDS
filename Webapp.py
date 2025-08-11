@@ -17,32 +17,8 @@ import json
 import matlab.engine
 import matplotlib.pyplot as plt
 
-# ============================ Helper Functions ============================ #
-def select_image():
-    # Prompt user to select an image to store in DNA
-    uploaded_file = st.file_uploader("Select images to store in DNA", type=["jpg", "png"])
-    if uploaded_file is None:
-        st.stop()  # Stop the process until an image is uploaded.
+config_path = "./config/config.json"
 
-    # Extract file name and suffix
-    file_name, suffix = uploaded_file.name.split('.')
-
-    # Get absolute path of the uploaded file
-    abs_file_path = os.path.abspath(uploaded_file.name)
-
-    # Get absolute directory for DNA library
-    abs_dir = os.path.dirname(abs_file_path)
-    dna_lib_dir = os.path.join(abs_dir, 'DNA_Library')
-    os.makedirs(dna_lib_dir, exist_ok=True)
-
-    # Prepare file paths
-    in_dna_name = os.path.join(dna_lib_dir, file_name + '.dna')
-    out_dna_name = os.path.join(dna_lib_dir, 'simu_' + file_name + '.dna')
-    out_file_name = os.path.join(dna_lib_dir, file_name + '_re.' + suffix)
-
-    print('DNA 库路径为:', dna_lib_dir)
-    print('输出文件路径为：', out_file_name)
-    return abs_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name
 
 # ---------------------------- Choosing parameters ---------------------------- # 
 
@@ -69,6 +45,7 @@ k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 2
 r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 5, max_value = 50, value = 15)
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
 
+save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_1), inner2 = (chunk_size + r_2, chunk_size)) # The same coding parameters are used for all images.
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
@@ -97,13 +74,14 @@ in_file_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
 in_file_name= "Jnu_test.jpg"
 file_name = "Jnu_test"
 suffix = "jpg"
+out_file_path = "D:/COPDS-main/DNA_Library/" + file_name + "_re." + suffix
+
 
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
 # Create the DNA_Library directory if it doesn't exist
 os.makedirs(dna_lib_dir, exist_ok=True)
-# File uploader for selecting images
-# in_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name = select_image()
+
 
 
 # =====================Segmentation==================== #
@@ -332,43 +310,30 @@ st.subheader('Load Data')
 Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
 
 # Run Simulation for each pool
-out_data_pools = []
+out_dna_pools = []
 for dnas in dna_pools:
     out_dnas = Channel(dnas)
-    out_data_pools.append(out_dnas)
+    out_dna_pools.append(out_dnas)
 'Simulation completed. '
 
 
 # -------------------Save Simulation results -------------------
-def extract_dnas(out_dnas):
-    '''
-    Extracts simulated DNA sequences from the output of the DNA channel model.
-    Input:
-    - out_dnas: List of dictionaries, containing error profiles and corresponding DNA sequences.
-    Output:
-    - result: List of simulated DNA sequences.
-    '''
-    result = []
-    for dna_set in out_dnas:
-        for dna_error_profile in dna_set['re']:
-            for i in range(dna_error_profile[0]):
-                result.append(dna_error_profile[2])
-    return result
-
 pools_out_file_path = os.path.join(dna_pools_dir, 'out.dna')
-for idx, out_dnas in enumerate(out_data_pools):
+temp = []
+for idx, out_dnas in enumerate(out_dna_pools):
     # Extract simulated DNA sequences
     dnas = extract_dnas(out_dnas)
     # Open the file in write mode
     with open(pools_out_file_path, "w") as file:
         # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
         json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
-
+    temp.append(dnas)
+out_dna_pools = temp
 print('Simulated DNAs saved to ', pools_out_file_path)
 
 
-# --------------------------- decoding ---------------------------- #
 # ===================== Read the simulated DNA ===================== #
+'''
 st.header('Decoding')
 st.subheader('Load Data')
 # Folder selection for DNA pools
@@ -402,60 +367,59 @@ if uploaded_dna_files:
 else:
     st.stop()
     st.warning("No DNA files selected.")
+'''
 
-#===============DNA to Binary====================#
+config_path = "./config/config.json"
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+#================= DNA to Binary ====================#
 st.subheader('DNA to Binary')
 QUANT2BIN = {'A': '00', 'C': '01', 'G': '10', 'T': '11'}
+out_binary_pools = []
+
 out_data_pools = []
-for out_dnas in out_dnas_pools:
+for out_dnas in out_dna_pools:
     IDX = [] # Store the index bits arrays
     INF = [] # Store the information bits arrays
-    for i, dna in enumerate(out_dnas):
-        bin_str = ''
-        if ((chunk_size + k_1 + r_1 + r_2) % 2 == 0):
-            for b in dna:
-                bin_str += QUANT2BIN[b]
+    for dna in out_dnas:
+        binary = dna_to_bin_array(dna) # Convert DNA to binary array
+        id = binary[:config["Coding_param"]["inner1"]["n"]] # Extract index part
+        if config[in_file_name]["Bin2DNA"]["is_padding"]: # Extract information part, remove padding bit if exists
+            inf = binary[config["Coding_param"]["inner1"]["n"]:-1] # Remove the padding bit
         else:
-            for j, b in enumerate(dna):
-                if j != len(dna) - 1:
-                    bin_str += QUANT2BIN[b]
-                else:
-                    bin_str += QUANT2BIN[b][1]
-        
-        ids = bin_str[:k_1 + r_1]
-        inf = bin_str[k_1 + r_1:chunk_size + k_1 + r_1 + r_2]
-        ids = np.array([float(s) for s in ids])
-        inf = np.array([float(s) for s in inf])
-        IDX.append(ids)
+            inf = binary[config["Coding_param"]["inner1"]["n"]:]
+        IDX.append(id)
         INF.append(inf)
     IDX = np.array(IDX)
     INF = np.array(INF)
-    # 'show data', IDX, INF
-    out_data_pools.append((IDX, INF))
+    out_data_pools.append({ "Index": IDX, "Information": INF })
 
 print('BCH Decoding...')
-
-out_data_pools = data_pools
-def BCH_Decoder(k, n, data):
-    readsnum = len(data[0]) # Number of reads in each pool
-    # BCH decode index part
-    eng = matlab.engine.start_matlab()
-    eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
-    cwr_ids = eng.BCH_Decoder(n, k, readsnum, data[0])
-    # BCH decode information part
-    cwr_data = eng.BCH_Decoder(chunk_size + r_2, chunk_size, readsnum, INF)
-    return cwr_ids, cwr_data
+# def BCH_Decoder(k, n, data):
+#     readsnum = len(data[""]) # Number of reads in each pool
+#     # BCH decode index part
+#     eng = matlab.engine.start_matlab()
+#     eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
+#     cwr_ids = eng.BCH_Decoder(n, k, readsnum, data[0])
+#     # BCH decode information part
+#     cwr_data = eng.BCH_Decoder(chunk_size + r_2, chunk_size, readsnum, INF)
+#     return cwr_ids, cwr_data
 
 # Decode each pool
+eng = matlab.engine.start_matlab()
+eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
 temp = []
-for pool_idx, (IDX, INF) in enumerate(out_data_pools):
-    cwr_ids, cwr_data = BCH_Decoder(k_1 + r_1, k_1, (IDX, INF))
-    temp.append((cwr_ids, cwr_data))
-# Store the decoded index and information parts
-out_data_pools = temp
-# 'show out_data_pools', out_data_pools
+for pool in out_data_pools:
+    IDX = pool["Index"]
+    INF = pool["Information"]
+    ids = eng.BCH_Decoder(config["Coding_param"]["inner1"]["n"], config["Coding_param"]["inner1"]["k"], len(IDX), IDX)
+    data = eng.BCH_Decoder(config["Coding_param"]["inner2"]["n"], config["Coding_param"]["inner2"]["k"], len(INF), INF)
+    temp.append({"Index": ids, "Information": data})
+out_data_pools  = temp
 
 print('BCH Decoding completed.')
+
 print('voting...')
 # Cluster the sequences with the same index in each pool
 def voting(IDX, INF, n_0, chunk_size):
@@ -605,7 +569,6 @@ if pad > 0:
     if len(last_chunk) > pad:
         decoded_chunks[-1] = last_chunk[:-pad]  # Remove padding bytes from the last chunk 
 
-out_file_path = "D:\\DeSP-main\\Data\\" + out_file_name
 # Save reconstructed image
 with open(out_file_path, "wb") as f:
     for chunk in decoded_chunks:

@@ -3,6 +3,24 @@
         "segmentation": {
             "chunk_num": 705,
             "pad": 6
+        },
+        "Bin2DNA": {
+            "is_padding": true,
+            "padding": 0
+        }
+    },
+    "Coding_param": {
+        "outer": {
+            "n": 1334,
+            "k": 1000
+        },
+        "inner1": {
+            "n": 26,
+            "k": 11
+        },
+        "inner2": {
+            "n": 419,
+            "k": 320
         }
     }
 }

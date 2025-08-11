@@ -8,6 +8,7 @@ from ordered_set import OrderedSet
 from scipy.spatial.distance import kulczynski1
 import os
 import json
+import streamlit as st
 
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
@@ -485,9 +486,28 @@ def read_dna_file(file_name):
     # Strip newline characters from each line
     dnas = [line.strip() for line in lines]
     return dnas
+
+#------------------extract dnas from output-----------------------#
+def extract_dnas(out_dnas):
+    '''
+    Extracts simulated DNA sequences from the output of the DNA channel model.
+    Input:
+    - out_dnas: List of dictionaries, containing error profiles and corresponding DNA sequences.
+    Output:
+    - result: List of simulated DNA sequences.
+    '''
+    result = []
+    for dna_set in out_dnas:
+        for dna_error_profile in dna_set['re']:
+            for i in range(dna_error_profile[0]):
+                result.append(dna_error_profile[2])
+    return result
+
+
 #--------------------------BCH---------------------------------#
 
 def effective_reduandancy(r_theory, k):
+
     """
     Description: Return the effective redundancy for a given optimal reduandancy in theory and information bit k.
     Return: The the closest effective redundancy r.
@@ -514,3 +534,54 @@ def effective_reduandancy(r_theory, k):
     if ((r + k) >= 2**order): # no effective
         r = effective_reduandancy(r, k) # Increase the order and refind.
     return r
+
+
+def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
+    '''
+    Save coding parameters to config file in JSON format.
+    outer_code: (n_0, k_0)
+    inner1: (n_1, k_1)
+    inner2: (n_2, k_2)
+    '''
+    # Read existing padding info if it exists
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config_data = json.load(f)
+            except json.JSONDecodeError:
+                config_data = {}
+    else:
+        config_data = {}
+    # Update padding info
+    config_data["Coding_param"] = {"outer": {"n": outer_code[0], "k": outer_code[1]}, "inner1": {"n": inner1[0], "k": inner1[1]}, "inner2": {"n": inner2[0], "k": inner2[1]}}
+    # Write back to padding info file in JSON format
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+
+# ----------------------Webapp----------------------------#
+def select_image():
+    # Prompt user to select an image to store in DNA
+    uploaded_file = st.file_uploader("Select images to store in DNA", type=["jpg", "png"])
+    if uploaded_file is None:
+        st.stop()  # Stop the process until an image is uploaded.
+
+    # Extract file name and suffix
+    file_name, suffix = uploaded_file.name.split('.')
+
+    # Get absolute path of the uploaded file
+    abs_file_path = os.path.abspath(uploaded_file.name)
+
+    # Get absolute directory for DNA library
+    abs_dir = os.path.dirname(abs_file_path)
+    dna_lib_dir = os.path.join(abs_dir, 'DNA_Library')
+    os.makedirs(dna_lib_dir, exist_ok=True)
+
+    # Prepare file paths
+    in_dna_name = os.path.join(dna_lib_dir, file_name + '.dna')
+    out_dna_name = os.path.join(dna_lib_dir, 'simu_' + file_name + '.dna')
+    out_file_name = os.path.join(dna_lib_dir, file_name + '_re.' + suffix)
+
+    print('DNA 库路径为:', dna_lib_dir)
+    print('输出文件路径为：', out_file_name)
+    return abs_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name
