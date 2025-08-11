@@ -562,20 +562,16 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 #----------------------LDPC----------------------------#
-class LDPC_codec:
-    def __init__(self, mode="encode", h_matrix_path='./config/H_matrix.txt'):
+class Codec:
+    def __init__(self, h_matrix_path='./config/H_matrix.txt'):
         """
         Initialize the LDPC codec with the specified mode and H matrix path.
         :param mode: 'encode' or 'decode'
         :param h_matrix_path: Path to the H matrix file for encoding/decoding
         """
-        self.mode = mode
-        if h_matrix_path:
-            self.h_matrix = self.load_h_matrix(h_matrix_path)
-        else:
-            self.h_matrix = None
+        self.h_matrix = h_matrix_path
 
-    def LDPC_encode(self, data_pools, ldpc_encoder_exe, mode, h_matrix_path):
+    def LDPC_encode(self, data_pools, ldpc_encoder_exe):
         """
         Encode data pools using LDPC encoder.
         Each pool is processed separately.
@@ -587,6 +583,7 @@ class LDPC_codec:
         Output:
         - encoded_data_pools: List of encoded pools, each pool is a list of encoded bit strings
         """
+        mode = "encode"
         encoded_data_pools = []
         for pool_idx, pool in enumerate(data_pools):
             # Prepare input file path
@@ -603,7 +600,7 @@ class LDPC_codec:
                     mode,
                     input_file,
                     output_file,
-                    h_matrix_path
+                    self.h_matrix
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -633,6 +630,22 @@ class LDPC_codec:
         # Implement LDPC decoding logic here
         pass
 
+
+def transpose_v2h(data_pools):
+    """
+    Transpose the data pools from vertical to horizontal for BCH encoding.
+    Each pool is a list of strings, each string is the i-th bit of all chunks.
+    Transpose to get a 2-D numpy array of shape (num_chunks, chunk_length).
+    """
+    transposed_data_pools = []
+    for pool in data_pools:
+        # Each pool is a list of bit strings (chunks)
+        # Convert to 2-D numpy array of shape (num_chunks, chunk_length)
+        arr = np.array([list(chunk) for chunk in pool], dtype=np.uint8)
+        # Transpose to shape (chunk_length, num_chunks)
+        transposed_pool = arr.T
+        transposed_data_pools.append(transposed_pool)
+    return transposed_data_pools
 # ----------------------Webapp----------------------------#
 def select_image():
     # Prompt user to select an image to store in DNA

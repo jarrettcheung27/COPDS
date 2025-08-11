@@ -122,7 +122,8 @@ data_pools = split_data(data, k_0)
 
 # =================================Encoding===================================#
 # LDPC encode
-'LDPC encoding...'
+print('LDPC encoding...')
+Codec = Codec(h_matrix_path="./config/Hmatrix.txt")
 # Transpose matrix for inter-oligos encoding
 def transpose_h2v(data_pools):
     """
@@ -145,24 +146,9 @@ ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
 h_matrix_path = ".\config\Hmatrix.txt"
 
 mode = "encode"
-data_pools = LDPC_encode(data_pools, ldpc_encoder_exe, mode, h_matrix_path)
+data_pools = Codec.LDPC_encode(data_pools, ldpc_encoder_exe)
 
 # Convert each pool to a 2-D numpy array and transpose for BCH encoding
-def transpose_v2h(data_pools):
-    """
-    Transpose the data pools from vertical to horizontal for BCH encoding.
-    Each pool is a list of strings, each string is the i-th bit of all chunks.
-    Transpose to get a 2-D numpy array of shape (num_chunks, chunk_length).
-    """
-    transposed_data_pools = []
-    for pool in data_pools:
-        # Each pool is a list of bit strings (chunks)
-        # Convert to 2-D numpy array of shape (num_chunks, chunk_length)
-        arr = np.array([list(chunk) for chunk in pool], dtype=np.uint8)
-        # Transpose to shape (chunk_length, num_chunks)
-        transposed_pool = arr.T
-        transposed_data_pools.append(transposed_pool)
-    return transposed_data_pools
 data_pools = transpose_v2h(data_pools)
 
 # -----------------------Indexing-----------------------
