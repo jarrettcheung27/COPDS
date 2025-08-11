@@ -379,21 +379,22 @@ QUANT2BIN = {'A': '00', 'C': '01', 'G': '10', 'T': '11'}
 out_binary_pools = []
 
 out_data_pools = []
+
+# separate index and information part
 for out_dnas in out_dna_pools:
-    IDX = [] # Store the index bits arrays
-    INF = [] # Store the information bits arrays
-    for dna in out_dnas:
+    ids = [] # Store the index bits arrays
+    infs = [] # Store the information bits arrays
+    temp_dnas = [] # Temporary dictionary to store DNA {id, information part, counts}.
+    for dna, num in out_dnas.items():
+        dna = dna.strip()
         binary = dna_to_bin_array(dna) # Convert DNA to binary array
         id = binary[:config["Coding_param"]["inner1"]["n"]] # Extract index part
         if config[in_file_name]["Bin2DNA"]["is_padding"]: # Extract information part, remove padding bit if exists
             inf = binary[config["Coding_param"]["inner1"]["n"]:-1] # Remove the padding bit
         else:
             inf = binary[config["Coding_param"]["inner1"]["n"]:]
-        IDX.append(id)
-        INF.append(inf)
-    IDX = np.array(IDX)
-    INF = np.array(INF)
-    out_data_pools.append({ "Index": IDX, "Information": INF })
+        temp_dnas.append([id, inf, num]) # Store the id, information part and counts
+    out_data_pools.append(temp_dnas)
 
 print('BCH Decoding...')
 # def BCH_Decoder(k, n, data):
@@ -403,78 +404,76 @@ print('BCH Decoding...')
 #     eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
 #     cwr_ids = eng.BCH_Decoder(n, k, readsnum, data[0])
 #     # BCH decode information part
-#     cwr_data = eng.BCH_Decoder(chunk_size + r_2, chunk_size, readsnum, INF)
+#     cwr_data = eng.BCH_Decoder(chunk_size + r_2, chunk_size, readsnum, infs)
 #     return cwr_ids, cwr_data
 
 # Decode each pool
 eng = matlab.engine.start_matlab()
 eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
-temp = []
+temp_pools = []
 for pool in out_data_pools:
-    IDX = pool["Index"]
-    INF = pool["Information"]
-    ids = eng.BCH_Decoder(config["Coding_param"]["inner1"]["n"], config["Coding_param"]["inner1"]["k"], len(IDX), IDX)
-    data = eng.BCH_Decoder(config["Coding_param"]["inner2"]["n"], config["Coding_param"]["inner2"]["k"], len(INF), INF)
-    temp.append({"Index": ids, "Information": data})
-out_data_pools  = temp
-
+    ids = np.array([segment[0] for segment in pool])
+    infs = np.array([segment[1] for segment in pool])
+    ids = eng.BCH_Decoder(config["Coding_param"]["inner1"]["n"], config["Coding_param"]["inner1"]["k"], len(ids), ids)
+    data = eng.BCH_Decoder(config["Coding_param"]["inner2"]["n"], config["Coding_param"]["inner2"]["k"], len(infs), infs)
+    temp = []
+    for i, id in enumerate(ids):
+        temp_id = ''.join(str(int(s)) for s in id[1:]) # Convert index bits to string, remove the first bit which is the flag
+        temp_data = ''.join(str(int(s)) for s in data[i][1:]) # Convert information bits to string, remove the first bit which is the flag
+        temp.append((temp_id, temp_data, pool[i][2])) # Store the id, information part and counts
+    temp_pools.append(temp)
+out_data_pools  = temp_pools
 print('BCH Decoding completed.')
 
 print('voting...')
 # Cluster the sequences with the same index in each pool
-def voting(IDX, INF, n_0, chunk_size):
-    for id in IDX:
-        segment_temp = ''.join(str(int(s)) for s in id[1:]) # Convert index bits to string
-        segments_temp.append(segment_temp)
-        indices_dec_str = segments_temp
-
-        segments_temp = []    
-        for data in INF:
-            segment_temp = ''.join(str(int(s)) for s in data[1:]) # Convert information bits to string
-            segments_temp.append(segment_temp)
-        inf_bit_dec_str = segments_temp
-
-        segments_temp = []
-        for i, inf_bit in enumerate(inf_bit_dec_str):
-            segment_temp = dict(index=0, num=0, data=' ')
-            segment_temp['index'] = int(indices_dec_str[i], 2)
-            segment_temp['data'] = inf_bit
-            segments_temp.append(segment_temp)
-        segments = segments_temp
-        segments_temp = []
-
-        for i in range(n_0):
-            segment_temp = dict(index=0, num=0, data=[])
-            segment_temp['index'] = i
-            for segment in segments:
-                if segment['index'] == i and len(segment['data']) == chunk_size:
-                    segment_temp['num'] += 1
-                    segment_temp['data'].append(segment['data'])
-            segments_temp.append(segment_temp)
-        segments = segments_temp
-
-        voting_result = []
-        for i, segment in enumerate(segments):
-            data = []
-            if segment['num'] > 1:
-                for j in range(chunk_size):
-                    bit_sum = 0
-                    for bit_string in segment['data']:
-                        bit_sum += int(bit_string[j])
-                    data.append(float(bit_sum / segment['num']))
-            elif segment['num'] == 1:
-                data = [float(bit) for bit in segment['data'][0]]
+def voting(pool, n_0, chunk_size):
+    '''
+    将相同index的序列聚类投票
+    输入：
+    ids: list of index bit strings
+    infs: list of information bit strings
+    n_0: number of chunks in the pool
+    chunk_size: size of each chunk in bits
+    '''
+    # prepare the segments for voting
+    result = {} # Store the voting result in a dictionary
+    for segment in pool:
+        ids = segment[0]  # Index bits
+        inf = segment[1]
+        num = segment[2]  # Number of sequences with the same index
+        if int(ids,2) <= n_0: 
+            if ids not in result:
+                result[ids] = {inf: num}
             else:
-                data = [0.5 for _ in range(chunk_size)]
-            data = np.array(data)
-            voting_result.append(data)
-        voting_result = np.array(voting_result)
+                if inf in result[ids]:
+                    result[ids][inf] += num
+                else:
+                    result[ids][inf] = num
+    # voting
+    voting_result = [] # Store the voting result
+    for ids, inf_dict in result.items():
+        # Sort the information bits by their counts
+        sorted_infs = sorted(inf_dict.items(), key=lambda x: x[1], reverse=True)
+        # Calculate the average of the most frequent information bits
+        avg_inf = np.zeros(chunk_size)
+        total_count = 0
+        for inf, count in sorted_infs:
+            avg_inf += np.array(list(map(int, inf))) * count
+            total_count += count
+        if total_count > 0:
+            avg_inf /= total_count
+        voting_result.append(avg_inf)
+    # Convert the voting result to a numpy array and transpose it for LDPC decoding
+    if len(voting_result) == 0:
+        # If no valid segments, return an empty array
+        voting_result = np.zeros((chunk_size, n_0))
+    voting_result = np.array(voting_result)
     return voting_result.T
 
 out_prob_pools = [] # Store the voting results for each pool
-for (IDX, INF) in out_data_pools:
-    segments_temp = []
-    voting_result = voting(IDX, INF, n_0, chunk_size)
+for pool in out_data_pools:
+    voting_result = voting(pool, config["Coding_param"]["outer"]["n"], config["Coding_param"]["inner2"]["k"])
     out_prob_pools.append(voting_result) # Probability of each bit in the voting result, for LDPC decoding
 print('Voting completed.')
 
@@ -484,10 +483,9 @@ print('Voting completed.')
 for pool_idx, v_score in enumerate(out_prob_pools):
     ldpc_input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_input_{pool_idx}.txt"
     np.savetxt(ldpc_input_file, v_score, fmt="%.3f", delimiter=" ")
-'Voiting results saved to LDPC input files.'   
-
+print('Voting results saved to LDPC input files.')
 # ===================== LDPC Decoding ===================== #
-'Inter-oligos Decoding...'
+print('LDPC Decoding...')
 for pool_idx, v_score in enumerate(out_data_pools):
     # Call LDPC decoder executable
     ldpc_decoder_exe = "D:\\DeSP-main\\App_Simulation_Platform\\LDPC_PEG-v2.0.exe"
@@ -577,7 +575,7 @@ with open(out_file_path, "wb") as f:
 st.success(f"Image reconstructed and saved as {out_file_path}")
 
 st.subheader('Quality Evaluation')
-st.image(out_file_path, width = 300)
+# st.image(out_file_path, width = 300)
 
 # ------------------------ optimizing ----------------------------- #
 '''

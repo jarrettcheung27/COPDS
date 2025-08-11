@@ -494,13 +494,12 @@ def extract_dnas(out_dnas):
     Input:
     - out_dnas: List of dictionaries, containing error profiles and corresponding DNA sequences.
     Output:
-    - result: List of simulated DNA sequences.
+    - result: Dictionary of simulated DNA sequences, key:DNA, value:number.
     '''
-    result = []
+    result = {}
     for dna_set in out_dnas:
         for dna_error_profile in dna_set['re']:
-            for i in range(dna_error_profile[0]):
-                result.append(dna_error_profile[2])
+            result[dna_error_profile[2]] = dna_error_profile[0]
     return result
 
 
