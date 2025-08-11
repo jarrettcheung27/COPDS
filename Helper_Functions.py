@@ -7,8 +7,12 @@ import numpy as np
 from ordered_set import OrderedSet
 from scipy.spatial.distance import kulczynski1
 import os
+import subprocess
 import json
 import streamlit as st
+import matplotlib.pyplot as plt
+from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution, save_simu_result
+import matplotlib.pyplot as plt
 
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
@@ -557,6 +561,77 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
     with open(config_path, "w") as f:
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
+#----------------------LDPC----------------------------#
+class LDPC_codec:
+    def __init__(self, mode="encode", h_matrix_path='./config/H_matrix.txt'):
+        """
+        Initialize the LDPC codec with the specified mode and H matrix path.
+        :param mode: 'encode' or 'decode'
+        :param h_matrix_path: Path to the H matrix file for encoding/decoding
+        """
+        self.mode = mode
+        if h_matrix_path:
+            self.h_matrix = self.load_h_matrix(h_matrix_path)
+        else:
+            self.h_matrix = None
+
+    def LDPC_encode(self, data_pools, ldpc_encoder_exe, mode, h_matrix_path):
+        """
+        Encode data pools using LDPC encoder.
+        Each pool is processed separately.
+        Input: 
+        - data_pools: List of pools, each pool is a list of bit strings (chunks)
+        - ldpc_encoder_exe: Path to the LDPC encoder executable
+        - mode: Mode for the LDPC encoder ('encode' or 'decode')
+        - h_matrix_path: Path to the H matrix file for LDPC encoding
+        Output:
+        - encoded_data_pools: List of encoded pools, each pool is a list of encoded bit strings
+        """
+        encoded_data_pools = []
+        for pool_idx, pool in enumerate(data_pools):
+            # Prepare input file path
+            input_file = f"D:/COPDS-main/Mid_data/ldpc_input_{pool_idx}.txt"
+            with open(input_file, "w") as f:
+                for chunk in pool:
+                    f.write(chunk + "\n")
+            
+            # Call LDPC encoder executable
+            output_file = f"D:/COPDS-main/Mid_data/ldpc_output_{pool_idx}.txt"
+            process = subprocess.Popen(
+                [
+                    ldpc_encoder_exe,
+                    mode,
+                    input_file,
+                    output_file,
+                    h_matrix_path
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            status_placeholder = st.empty()
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                # Show only the latest output line in the app, in one line
+                status_placeholder.text(line.strip())
+            process.stdout.close()
+            process.wait()
+
+            # Read encoded data back
+            encoded_pool = []
+            with open(output_file, "r") as f:
+                for line in f:
+                    encoded_pool.append(line.strip())
+            encoded_data_pools.append(encoded_pool)
+        return encoded_data_pools
+
+    def decode(self, data):
+        """
+        Decode the input data using LDPC decoding.
+        """
+        # Implement LDPC decoding logic here
+        pass
 
 # ----------------------Webapp----------------------------#
 def select_image():
@@ -584,3 +659,18 @@ def select_image():
     print('DNA 库路径为:', dna_lib_dir)
     print('输出文件路径为：', out_file_name)
     return abs_file_path, file_name, suffix, in_dna_name, out_dna_name, out_file_name
+
+
+# ----------------------Data analysis----------------------------#
+def inspect(dnas, num_th = 1, inspect_index = 20):
+    fig = plt.figure(figsize = (12,6))
+    plt.subplot(1,2,1)
+    plot_oligo_number_distribution(dnas)
+    plt.subplot(1,2,2)
+    plot_error_distribution(dnas,th = num_th)
+    st.write(fig)
+    dc = dna_chunk(dnas[inspect_index],'html')
+    table = dc.plot_re_dnas()
+    st.markdown(table, unsafe_allow_html = True)
+    st.write(dc.plot_voting_result())
+
