@@ -145,7 +145,6 @@ data_pools = transpose_h2v(data_pools)
 ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
 h_matrix_path = ".\config\Hmatrix.txt"
 
-mode = "encode"
 data_pools = Codec.LDPC_encode(data_pools, ldpc_encoder_exe)
 
 # Convert each pool to a 2-D numpy array and transpose for BCH encoding
@@ -413,18 +412,7 @@ for pool_idx, v_score in enumerate(out_prob_pools):
     np.savetxt(ldpc_input_file, v_score, fmt="%.3f", delimiter=" ")
 print('Voting results saved to LDPC input files.')
 # ===================== LDPC Decoding ===================== #
-print('LDPC Decoding...')
-for pool_idx, v_score in enumerate(out_data_pools):
-    LDPC_decoder = LDPC_codec(mode="decode")
-    # Call LDPC decoder executable
-    ldpc_decoder_exe = "D:\\DeSP-main\\App_Simulation_Platform\\LDPC_PEG-v2.0.exe"
-    h_matrix_path = "D:\\DeSP-main\\App_Simulation_Platform\\config\\Hmatrix.txt"
-    ldpc_output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_{pool_idx}.txt"
-    mode = "decode"
-    result = subprocess.run([ldpc_decoder_exe, mode, ldpc_input_file, ldpc_output_file, h_matrix_path], capture_output=True, text=True)
-    print(result.stdout)  # Print the output from the LDPC decoder
-    print(result.stderr)  # Print any error messages from the LDPC decoder
-print('LDPC Decoding completed.')
+
 
 # calculate the BER
 input_msg_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_input_0.txt"

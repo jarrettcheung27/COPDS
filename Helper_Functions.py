@@ -86,7 +86,7 @@ def load_dna(file_name):
     return in_dnas
 
 # Save segmentation configuration for later reconstruction
-def save_config_segmentation(in_file_name, chunk_num, pad):
+def save_config_segmentation(in_file_name, pools_num, chunk_num, pad):
     '''
     Save the segmentation configuration to a file in JSON format.
     The configuration includes the number of chunks and padding information.
@@ -106,7 +106,7 @@ def save_config_segmentation(in_file_name, chunk_num, pad):
         config_data = {}
     # Update segmentation config with current image info
 
-    config_data[in_file_name]["segmentation"] = {"chunk_num": chunk_num, "pad": pad}
+    config_data[in_file_name]["segmentation"] = {"pools_num": pools_num, "chunk_num": chunk_num, "pad": pad}
 
     # Write back to config file in JSON format
     with open(config_path, "w") as f:
@@ -562,7 +562,7 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 #----------------------LDPC----------------------------#
-class Codec:
+class LDPC_Codec:
     def __init__(self, h_matrix_path='./config/H_matrix.txt'):
         """
         Initialize the LDPC codec with the specified mode and H matrix path.
@@ -570,8 +570,9 @@ class Codec:
         :param h_matrix_path: Path to the H matrix file for encoding/decoding
         """
         self.h_matrix = h_matrix_path
+        
 
-    def LDPC_encode(self, data_pools, ldpc_encoder_exe):
+    def encode(self, data_pools, ldpc_encoder_exe):
         """
         Encode data pools using LDPC encoder.
         Each pool is processed separately.
@@ -623,13 +624,24 @@ class Codec:
             encoded_data_pools.append(encoded_pool)
         return encoded_data_pools
 
-    def decode(self, data):
+    def decode(self, segment_num):
         """
         Decode the input data using LDPC decoding.
+        Input:
+        - segment_num: Number of segments (pools) to decode 
         """
-        # Implement LDPC decoding logic here
-        pass
-
+        print('LDPC Decoding...')
+        ldpc_decoder_exe = "D:\\DeSP-main\\App_Simulation_Platform\\LDPC_PEG-v2.0.exe"
+        h_matrix_path = "D:\\DeSP-main\\App_Simulation_Platform\\config\\Hmatrix.txt"
+        for pool_idx in range(segment_num):
+            # Call LDPC decoder executable
+            ldpc_input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_input_{pool_idx}.txt"
+            ldpc_output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_{pool_idx}.txt"
+            mode = "decode"
+            result = subprocess.run([ldpc_decoder_exe, mode, ldpc_input_file, ldpc_output_file, h_matrix_path], capture_output=True, text=True)
+            print(result.stdout)  # Print the output from the LDPC decoder
+            print(result.stderr)  # Print any error messages from the LDPC decoder
+        print('LDPC Decoding completed.')
 
 def transpose_v2h(data_pools):
     """
