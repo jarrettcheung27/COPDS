@@ -13,7 +13,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution, save_simu_result
 import matplotlib.pyplot as plt
-
+import matlab.engine
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
 
@@ -84,6 +84,28 @@ def load_dna(file_name):
         dnas = f.readlines()
     in_dnas = [dna.split('\n')[0] for dna in dnas]
     return in_dnas
+
+def split_data(data, pool_size, chunk_size):
+    """
+    Split data into pools of size pool_size.
+    If the last pool is smaller than pool_size, pad it with random bits.
+    Input:
+    - data: List of bit strings (each string is a chunk of bits)
+    - pool_size: Size of each pool
+    Output:
+    - data_pools: List of pools, each pool is a list of bit strings
+    """
+    data_pools = []
+    for i in range(0, len(data), pool_size):
+        pool = data[i:i+pool_size]
+        # If last pool is smaller than pool_size, pad with random bits
+        if len(pool) < pool_size:
+            chunk_len = len(pool[0]) if pool else chunk_size
+            for _ in range(pool_size - len(pool)):
+                random_bits = ''.join(random.choice('01') for _ in range(chunk_len))
+                pool.append(random_bits)
+        data_pools.append(pool)
+    return data_pools
 
 # Save segmentation configuration for later reconstruction
 def save_config_segmentation(in_file_name, pools_num, chunk_num, pad):
@@ -397,6 +419,57 @@ def int_to_binary_array(number, length):
     binary_array = [float(int(bit)) for bit in padded_binary_str]
     
     return np.array(binary_array)
+def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pools_dir):
+    """
+    Convert binary codewords to DNA sequences pools.
+    Each codeword is a binary array, and each pool is a list of codewords.
+    Args:
+        data_pools (list of np.ndarray): List of binary codewords pools.
+        dna_length (int): Length of each DNA sequence in nucleotides.
+        is_padding (bool): Whether to pad the binary codewords to fit the DNA length.
+    """
+    # Convert binary codewords to DNA sequences
+    dna_pools = []
+    for data_pool in data_pools:
+        dnas = []
+        for binary_codeword in data_pool:
+            if is_padding: # check length of each codeword, if less than dna_length*2, pad with 0s.
+                binary_codeword = np.pad(binary_codeword, (0, dna_length*2 - len(binary_codeword)), 'constant')
+            bit_str = ''.join(binary_codeword.astype(int).astype(str))
+            dna = bin_to_dna(bit_str)
+            dnas.append(dna)
+        dna_pools.append(dnas)
+    
+    # ------------ Save DNAs to files --------------- #
+    # Create a subfolder in DNA_Library named as "<image_name> DNA pools"
+    os.makedirs(dna_pools_dir, exist_ok=True)
+    # Save DNA pools to a .dna file, with different key for each pool
+    pools_in_file_name = os.path.join(dna_pools_dir, 'in.dna')
+    for idx, dnas in enumerate(dna_pools):
+        # Open the file in write mode
+        with open(pools_in_file_name, "w") as file:
+            # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+            json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
+    print('Synthesised DNAs saved to ', pools_in_file_name)
+    return dna_pools
+
+def DNA_pools_to_binary(coding_config, in_file_name, out_dna_pools):
+    print('DNA to binary...')
+    out_data_pools = []
+    # separate index and information part
+    for out_dnas in out_dna_pools:
+        temp_dnas = [] # Temporary dictionary to store DNA {id, information part, counts}.
+        for dna, num in out_dnas.items():
+            dna = dna.strip()
+            binary = dna_to_bin_array(dna) # Convert DNA to binary array
+            id = binary[:coding_config["Coding_param"]["inner1"]["n"]] # Extract index part
+            if coding_config[in_file_name]["Bin2DNA"]["is_padding"]: # Extract information part, remove padding bit if exists
+                inf = binary[coding_config["Coding_param"]["inner1"]["n"]:-1] # Remove the padding bit
+            else:
+                inf = binary[coding_config["Coding_param"]["inner1"]["n"]:]
+            temp_dnas.append([id, inf, num]) # Store the id, information part and counts
+        out_data_pools.append(temp_dnas)
+    return out_data_pools
 # Save padding info of binary to DNA conversion
 def save_padding_info_bin2DNA(file_name, is_padding, padding):
     '''
@@ -538,29 +611,56 @@ def effective_reduandancy(r_theory, k):
         r = effective_reduandancy(r, k) # Increase the order and refind.
     return r
 
+class BCH_Codec:
+    def __init__(self, encode_config = None, decode_config = None):
+        if encode_config is None:
+            self.n1 = decode_config["Coding_param"]["inner1"]["n"]
+            self.k1 = decode_config["Coding_param"]["inner1"]["k"]
+            self.k2 = decode_config["Coding_param"]["inner2"]["k"]
+            self.n2 = decode_config["Coding_param"]["inner2"]["n"]
+            self.n0 = decode_config["Coding_param"]["outer"]["n"]
+        else:
+            self.n1 = encode_config["n1"]
+            self.k1 = encode_config["k1"]
+            self.k2 = encode_config["k2"]
+            self.n2 = encode_config["n2"]
+            self.n0 = encode_config["n0"]
 
-def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
-    '''
-    Save coding parameters to config file in JSON format.
-    outer_code: (n_0, k_0)
-    inner1: (n_1, k_1)
-    inner2: (n_2, k_2)
-    '''
-    # Read existing padding info if it exists
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            try:
-                config_data = json.load(f)
-            except json.JSONDecodeError:
-                config_data = {}
-    else:
-        config_data = {}
-    # Update padding info
-    config_data["Coding_param"] = {"outer": {"n": outer_code[0], "k": outer_code[1]}, "inner1": {"n": inner1[0], "k": inner1[1]}, "inner2": {"n": inner2[0], "k": inner2[1]}}
-    # Write back to padding info file in JSON format
-    with open(config_path, "w") as f:
-        json.dump(config_data, f, indent=4, ensure_ascii=False)
 
+    def encode(self, ids, data_pools):
+        print("BCH encoding...")
+        matlab_engine = matlab.engine.start_matlab()
+        matlab_engine.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
+        eng = matlab_engine
+        # Encode index by BCH encoder.
+        st.text('BCH encoding...')
+        cwr_ids = eng.BCH_Encoder(self.n1, self.k1, self.n0, ids)
+        for pool_idx, pool in enumerate(data_pools):
+            # Encode information bit by BCH encoder.
+            cwr_data = eng.BCH_Encoder(self.n2, self.k2, self.n0, pool)
+            data_pools[pool_idx] = np.concatenate((cwr_ids, cwr_data), axis=1)
+        print("BCH encoding completed.")
+        return data_pools
+    def decode(self, out_data_pools):
+        print('BCH Decoding...')
+        # Decode each pool
+        eng = matlab.engine.start_matlab()
+        eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
+        temp_pools = []
+        for pool in out_data_pools:
+            ids = np.array([segment[0] for segment in pool])
+            infs = np.array([segment[1] for segment in pool])
+            ids = eng.BCH_Decoder(self.n1, self.k1, len(ids), ids)
+            data = eng.BCH_Decoder(self.n2, self.k2, len(infs), infs)
+            temp = []
+            for i, id in enumerate(ids):
+                temp_id = ''.join(str(int(s)) for s in id[1:]) # Convert index bits to string, remove the first bit which is the flag
+                temp_data = ''.join(str(int(s)) for s in data[i][1:]) # Convert information bits to string, remove the first bit which is the flag
+                temp.append((temp_id, temp_data, pool[i][2])) # Store the id, information part and counts
+            temp_pools.append(temp)
+        out_data_pools  = temp_pools
+        print('BCH Decoding completed.')
+        return out_data_pools
 #----------------------LDPC----------------------------#
 class LDPC_Codec:
     def __init__(self, h_matrix_path='./config/H_matrix.txt'):
@@ -639,9 +739,9 @@ class LDPC_Codec:
             ldpc_output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_{pool_idx}.txt"
             mode = "decode"
             result = subprocess.run([ldpc_decoder_exe, mode, ldpc_input_file, ldpc_output_file, h_matrix_path], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
-            print(result.stderr)  # Print any error messages from the LDPC decoder
-        print('LDPC Decoding completed.')
+            # print(result.stdout)  # Print the output from the LDPC decoder
+            # print(result.stderr)  # Print any error messages from the LDPC decoder
+        print('Completed!')
 
 def transpose_v2h(data_pools):
     """
@@ -658,6 +758,96 @@ def transpose_v2h(data_pools):
         transposed_pool = arr.T
         transposed_data_pools.append(transposed_pool)
     return transposed_data_pools
+def transpose_h2v(data_pools):
+    """
+    Transpose the data pools from horizontal to vertical for inter-oligos encoding.
+    Each pool is a list of bit strings (chunks).
+    Transpose to get a list of strings, each string is the i-th bit of all chunks.
+    """
+    transposed_data_pools = []
+    for pool in data_pools:
+        # Each pool is a list of bit strings (chunks)
+        # Transpose: list of strings -> list of strings, each string is the i-th bit of all chunks
+        transposed_pool = [''.join(chunk[i] for chunk in pool) for i in range(len(pool[0]))]
+        transposed_data_pools.append(transposed_pool)
+    return transposed_data_pools
+
+def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
+    '''
+    Save coding parameters to config file in JSON format.
+    outer_code: (n_0, k_0)
+    inner1: (n_1, k_1)
+    inner2: (n_2, k_2)
+    '''
+    # Read existing padding info if it exists
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config_data = json.load(f)
+            except json.JSONDecodeError:
+                config_data = {}
+    else:
+        config_data = {}
+    # Update padding info
+    config_data["Coding_param"] = {"outer": {"n": outer_code[0], "k": outer_code[1]}, "inner1": {"n": inner1[0], "k": inner1[1]}, "inner2": {"n": inner2[0], "k": inner2[1]}}
+    # Write back to padding info file in JSON format
+    with open(config_path, "w") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+# ----------------------voting----------------------------#
+def voting(pool, n_0, index_length, chunk_size):
+    '''
+    将相同index的序列聚类投票
+    输入：
+    ids: list of index bit strings
+    infs: list of information bit strings
+    n_0: number of chunks in the pool
+    chunk_size: size of each chunk in bits
+    '''
+    # prepare the segments for voting
+    result = {} # Store the voting result in a dictionary
+
+    for segment in pool:
+        ids = segment[0]  # Index bits
+        inf = segment[1]
+        num = segment[2]  # Number of sequences with the same index
+        
+        if int(ids,2) <= n_0: 
+            if ids not in result:
+                result[ids] = {inf: num}
+            else:
+                if inf in result[ids]:
+                    result[ids][inf] += num
+                else:
+                    result[ids][inf] = num
+    # if some ids are missing, fill them with empty dictionaries, key are the index bits of length index_length in binary
+    for i in range(n_0):
+        if f"{i:0{index_length}b}" not in result:
+            result[f"{i:0{index_length}b}"] = {}
+    # sort result by index bits
+    result = dict(sorted(result.items(), key=lambda x: int(x[0], 2)))  # Sort by index bits
+    # voting
+    voting_result = [] # Store the voting result
+    for ids, inf_dict in result.items():
+        # Sort the information bits by their counts
+        sorted_infs = sorted(inf_dict.items(), key=lambda x: x[1], reverse=True)
+        # Calculate the average of the most frequent information bits
+        avg_inf = np.zeros(chunk_size)
+        total_count = 0
+        for inf, count in sorted_infs:
+            avg_inf += np.array(list(map(int, inf))) * count
+            total_count += count
+        if total_count > 0:
+            avg_inf /= total_count
+        voting_result.append(avg_inf)
+    # Convert the voting result to a numpy array and transpose it for LDPC decoding
+    if len(voting_result) == 0:
+        # If no valid segments, return an empty array
+        voting_result = np.zeros((chunk_size, n_0))
+    voting_result = np.array(voting_result)
+    return voting_result.T
+
+
 # ----------------------Webapp----------------------------#
 def select_image():
     # Prompt user to select an image to store in DNA

@@ -1,6 +1,7 @@
 {
     "Jnu_test.jpg": {
         "segmentation": {
+            "pools_num": 1,
             "chunk_num": 705,
             "pad": 6
         },

@@ -1,4 +1,4 @@
-from Encode.Helper_Functions import dna_to_int_array, rs_decode, preprocess, load_dna
+from Helper_Functions import dna_to_int_array, rs_decode, preprocess, load_dna
 from Analysis.Analysis import dna_chunk, save_simu_result,  error_distribution
 from Encode.DNAFountain import DNAFountain, Glass
 import numpy as np
