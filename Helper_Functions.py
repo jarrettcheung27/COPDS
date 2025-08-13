@@ -639,7 +639,7 @@ class BCH_Codec:
             # Encode information bit by BCH encoder.
             cwr_data = eng.BCH_Encoder(self.n2, self.k2, self.n0, pool)
             data_pools[pool_idx] = np.concatenate((cwr_ids, cwr_data), axis=1)
-        print("BCH encode completed.")
+        print("BCH encoding completed.")
         return data_pools
     def decode(self, out_data_pools):
         print('BCH Decoding...')
@@ -659,22 +659,20 @@ class BCH_Codec:
                 temp.append((temp_id, temp_data, pool[i][2])) # Store the id, information part and counts
             temp_pools.append(temp)
         out_data_pools  = temp_pools
-        print('BCH decode completed.')
+        print('BCH Decoding completed.')
         return out_data_pools
 #----------------------LDPC----------------------------#
 class LDPC_Codec:
-    def __init__(self, h_matrix_path='D:/COPDS-main/config/Hmatrix.txt',LDPC_codec_path = "D:/COPDS-main/Encode/LDPC_PEG-v2.0.exe", mid_data_folder = "D:/COPDS-main/Mid_data/"):
+    def __init__(self, h_matrix_path='./config/H_matrix.txt'):
         """
         Initialize the LDPC codec with the specified mode and H matrix path.
         :param mode: 'encode' or 'decode'
         :param h_matrix_path: Path to the H matrix file for encoding/decoding
         """
         self.h_matrix = h_matrix_path
-        self.LDPC_codec_path = LDPC_codec_path
-        self.mid_data_folder = mid_data_folder # folder for mid data
-        if not os.path.exists(self.mid_data_folder):
-            os.makedirs(self.mid_data_folder)
-    def encode(self, data_pools):
+        
+
+    def encode(self, data_pools, ldpc_encoder_exe):
         """
         Encode data pools using LDPC encoder.
         Each pool is processed separately.
@@ -690,18 +688,34 @@ class LDPC_Codec:
         encoded_data_pools = []
         for pool_idx, pool in enumerate(data_pools):
             # Prepare input file path
-            input_file = self.mid_data_folder + f"ldpc_encode_input_{pool_idx}.txt"
+            input_file = f"D:/COPDS-main/Mid_data/ldpc_input_{pool_idx}.txt"
             with open(input_file, "w") as f:
                 for chunk in pool:
                     f.write(chunk + "\n")
             
             # Call LDPC encoder executable
-            output_file = self.mid_data_folder + f"ldpc_encode_output_{pool_idx}.txt"
-            # Call LDPC decoder executable
-            mode = "encode"
-            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
-            print(result.stderr)  # Print any error messages from the LDPC decoder
+            output_file = f"D:/COPDS-main/Mid_data/ldpc_output_{pool_idx}.txt"
+            process = subprocess.Popen(
+                [
+                    ldpc_encoder_exe,
+                    mode,
+                    input_file,
+                    output_file,
+                    self.h_matrix
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            status_placeholder = st.empty()
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                # Show only the latest output line in the app, in one line
+                status_placeholder.text(line.strip())
+            process.stdout.close()
+            process.wait()
+
             # Read encoded data back
             encoded_pool = []
             with open(output_file, "r") as f:
@@ -710,23 +724,22 @@ class LDPC_Codec:
             encoded_data_pools.append(encoded_pool)
         return encoded_data_pools
 
-    def decode(self, out_prob_pools):
+    def decode(self, segment_num):
         """
         Decode the input data using LDPC decoding.
         Input:
         - segment_num: Number of segments (pools) to decode 
         """
         print('LDPC Decoding...')
-        # Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
-        for pool_idx, v_score in enumerate(out_prob_pools):
-            input_file = self.mid_data_folder + f"ldpc_decode_input_{pool_idx}.txt"
-            output_file = self.mid_data_folder + f"ldpc_decode_output_{pool_idx}.txt"
-            
-            np.savetxt(input_file, v_score, fmt="%.3f", delimiter=" ")
+        ldpc_decoder_exe = "D:\\DeSP-main\\App_Simulation_Platform\\LDPC_PEG-v2.0.exe"
+        h_matrix_path = "D:\\DeSP-main\\App_Simulation_Platform\\config\\Hmatrix.txt"
+        for pool_idx in range(segment_num):
             # Call LDPC decoder executable
+            ldpc_input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_input_{pool_idx}.txt"
+            ldpc_output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_{pool_idx}.txt"
             mode = "decode"
-            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
+            result = subprocess.run([ldpc_decoder_exe, mode, ldpc_input_file, ldpc_output_file, h_matrix_path], capture_output=True, text=True)
+            # print(result.stdout)  # Print the output from the LDPC decoder
             # print(result.stderr)  # Print any error messages from the LDPC decoder
         print('Completed!')
 
