@@ -28,7 +28,9 @@ n_0 = st.sidebar.number_input('Outer code length $n_0$', min_value = 200, max_va
 # k_0 = 1000 # Default value for k_0, LDPC code parameter
 k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 24, value = 11)
 r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 5, max_value = 50, value = 15)
+k_2 = chunk_size
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
+coding_config = {"Coding_param" : {"outer": {"n": n_0, "k": k_0}, "inner1": {"n": k_1 + r_1, "k": k_1}, "inner2": {"n": k_2 + r_2, "k": k_2}}}
 save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_1), inner2 = (chunk_size + r_2, chunk_size)) # The same coding parameters are used for all images.
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
@@ -91,22 +93,21 @@ data = [bytes2bits(chunk) for chunk in data]
 
 data_pools = split_data(data, pool_size=k_0, chunk_size=chunk_size)
 pools_num = len(data_pools)
+
 save_config_segmentation(in_file_name, pools_num, len(data), pad)
 'Data is divided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'
 
-# 'Datas is devided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'    
-# Prepare input file for the encoder
-# for pool_idx, pool in enumerate(data_pools):
-#     input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_input_{pool_idx}.txt"
-#     with open(input_file, "w") as f:
-#         for chunk in pool:
-#             f.write(chunk + "\n")
-
+# Save input message for debugging
+for pool_idx, pool in enumerate(data_pools):
+    message_input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_encode_input_{pool_idx}.txt"
+    with open(message_input_file, "w") as f:
+        for chunk in pool:
+            f.write(chunk + "\n")
 
 # =================================Encoding===================================#
 # LDPC encode
 print('LDPC encoding...')
-LDPC = LDPC_Codec(h_matrix_path="./config/Hmatrix.txt")
+LDPC = LDPC_Codec()
 # Transpose matrix for inter-oligos encoding
 data_pools = transpose_h2v(data_pools)
 'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
@@ -115,7 +116,7 @@ data_pools = transpose_h2v(data_pools)
 ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
 h_matrix_path = ".\config\Hmatrix.txt"
 
-data_pools = LDPC.encode(data_pools, ldpc_encoder_exe)
+data_pools = LDPC.encode(data_pools)
 
 # Convert each pool to a 2-D numpy array and transpose for BCH encoding
 data_pools = transpose_v2h(data_pools)
@@ -133,120 +134,43 @@ encode_config['n0'] = n_0
 BCH = BCH_Codec(encode_config = encode_config)
 data_pools = BCH.encode(ids, data_pools)
 
-#===============================Binary to DNA===============================#
-st.subheader('Binary to DNA')
-total_bits = chunk_size + k_1 + r_1 + r_2
-dna_length = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
-if (total_bits % 2) != 0:
-    is_padding = True
-else:
-    is_padding = False
-save_padding_info_bin2DNA(in_file_name, is_padding, 0) # Save padding info for binary to DNA conversion
-
-dna_pools = binary_to_dna_pools(data_pools, dna_length, is_padding, dna_pools_dir)
-
-# ============================= DNA simulation Channel ============================= #
-st.header('Error simulation of the DNA data storage channel')
-
-st.subheader('Load Data')
-Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
-
-# Run Simulation for each pool
-out_dna_pools = []
-for dnas in dna_pools:
-    out_dnas = Channel(dnas)
-    out_dna_pools.append(out_dnas)
-'Simulation completed. '
-
-
-# --------------Save Simulation results ----------------
-pools_out_file_path = os.path.join(dna_pools_dir, 'out.dna')
-temp = []
-for idx, out_dnas in enumerate(out_dna_pools):
-    # Extract simulated DNA sequences
-    dnas = extract_dnas(out_dnas)
-    # Open the file in write mode
-    with open(pools_out_file_path, "w") as file:
-        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-        json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
-    temp.append(dnas)
-out_dna_pools = temp
-print('Simulated DNAs saved to ', pools_out_file_path)
-
-
-# ===================== Read the simulated DNA ===================== #
-'''
-st.header('Decoding')
-st.subheader('Load Data')
-# Folder selection for DNA pools
-
-uploaded_dna_files = st.file_uploader(
-    "Select one or more simulated DNA pool to decode", 
-    type=["dna"], 
-    accept_multiple_files=True
-)
-# Obtain the original image file name from the selected .dna file
-file_name = ''
-if uploaded_dna_files:
-    # Use the first uploaded file as reference
-    dna_file_name = uploaded_dna_files[0].name
-    # Remove 'simu_' prefix if present and split at the last underscore
-    base_name = dna_file_name
-    if base_name.startswith('simu_'):
-        base_name = base_name[5:]
-    file_name = base_name.rsplit('_', 1)[0]
-out_file_name = file_name + '_reconstructed.jpg'    
-
-if uploaded_dna_files:
-    out_dnas_pools = []
-    strands_num = 0;
-    for uploaded_file in uploaded_dna_files:
-        dnas = uploaded_file.read().decode("utf-8").splitlines()
-        out_dnas = [dna.strip() for dna in dnas]
-        strands_num += len(out_dnas)
-        out_dnas_pools.append(out_dnas)
-    st.success(f"Loaded {strands_num} strands of length {len(out_dnas[0])} nts")
-else:
-    st.stop()
-    st.warning("No DNA files selected.")
-'''
-
+# ------------------encode - decode conversion-------------
+out_data_pools = []
+for pool in data_pools:
+    out_data_pool = []
+    for segment in pool:
+        ids = segment[0:encode_config['n1']]
+        data = segment[-encode_config['n2']:]
+        out_data_pool.append([ids,data,1])
+    out_data_pools.append(out_data_pool)
 config_path = "./config/config.json"
 with open(config_path, 'r', encoding='utf-8') as f:
     coding_config = json.load(f)
-
-#================= DNA to Binary ====================#
-st.subheader('DNA to Binary')
-out_data_pools = DNA_pools_to_binary(coding_config,in_file_name,out_dna_pools)
-
 # ============================== BCH Decoding ============================= #
+
 BCH = BCH_Codec(decode_config = coding_config)
 out_data_pools = BCH.decode(out_data_pools)
-
 print('voting...')
 # Cluster the sequences with the same index in each pool
 out_prob_pools = [] # Store the voting results for each pool
 for pool in out_data_pools:
     voting_result = voting(pool, coding_config["Coding_param"]["outer"]["n"], coding_config["Coding_param"]["inner1"]["k"], coding_config["Coding_param"]["inner2"]["k"])
     out_prob_pools.append(voting_result) # Probability of each bit in the voting result, for LDPC decoding
+print(f'Complete!')
 
-# Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
-for pool_idx, v_score in enumerate(out_prob_pools):
-    ldpc_input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_input_{pool_idx}.txt"
-    np.savetxt(ldpc_input_file, v_score, fmt="%.3f", delimiter=" ")
-print(f'Complete! Voting results saved to {ldpc_input_file}.')
 
 # ===================== LDPC Decoding ===================== #
-LDPC.decode(coding_config[in_file_name]["segmentation"]["pools_num"])
+LDPC = LDPC_Codec()
+LDPC.decode(out_prob_pools)
 
 # ===================== testing =====================
 # calculate the BER
-input_msg_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_input_0.txt"
-output_msg_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_0.txt"
+message_input_file = f"./Mid_data/ldpc_encode_input_0.txt"
+message_output_file = f"./Mid_data/ldpc_decode_output_0.txt"
 
 # Calculate Bit Error Rate (BER)
-def calculate_ber(input_file, output_file):
-    with open(input_file, "r") as fin, open(output_file, "r") as fout:
+def calculate_ber(message_input_file, message_output_file):
+    with open(message_input_file, "r") as fin, open(message_output_file, "r") as fout:
         input_lines = [line.strip() for line in fin]
         output_lines = [line.strip() for line in fout]
     total_bits = 0
@@ -257,9 +181,8 @@ def calculate_ber(input_file, output_file):
     ber = error_bits / total_bits if total_bits > 0 else 0
     return ber
 
-ber = calculate_ber(input_msg_file, output_msg_file)
+ber = calculate_ber(message_input_file, message_output_file)
 print(f"Bit Error Rate (BER): {ber:.6f}")
-
 
 st.header('Image Reconstruction')
 # Read decoded output to reconstruct the image
