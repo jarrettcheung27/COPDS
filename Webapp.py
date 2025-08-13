@@ -28,7 +28,9 @@ n_0 = st.sidebar.number_input('Outer code length $n_0$', min_value = 200, max_va
 # k_0 = 1000 # Default value for k_0, LDPC code parameter
 k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 24, value = 11)
 r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 5, max_value = 50, value = 15)
+k_2 = chunk_size
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
+coding_config = {"Coding_param" : {"outer": {"n": n_0, "k": k_0}, "inner1": {"n": k_1 + r_1, "k": k_1}, "inner2": {"n": k_2 + r_2, "k": k_2}}}
 save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_1), inner2 = (chunk_size + r_2, chunk_size)) # The same coding parameters are used for all images.
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
@@ -39,7 +41,7 @@ arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, ma
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
 # PCR stage
-arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =10)
+arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =8)
 arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.8)
 
 # decay stage
@@ -47,19 +49,21 @@ arg.decay_er = 0
 arg.decay_loss_rate = 0.01
 
 # sequencing stage
-arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
-arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
-arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
-
 seq_platform = st.sidebar.selectbox('Sequencing Platform',['Illumina Sequencing','Nanopore'])
-
-index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
-
 if seq_platform == 'Illumina Sequencing':
     arg.seq_TM = config.TM_NGS
 else:
     arg.seq_TM = config.TM_NNP
+arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
+arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
+arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
 
+
+
+
+
+# inspect index
+index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
 # ------------- file path--------------- #
 abs_dir  = "D:/COPDS-main/"
 dna_lib_dir = abs_dir + 'DNA_Library/'
@@ -91,22 +95,21 @@ data = [bytes2bits(chunk) for chunk in data]
 
 data_pools = split_data(data, pool_size=k_0, chunk_size=chunk_size)
 pools_num = len(data_pools)
+
 save_config_segmentation(in_file_name, pools_num, len(data), pad)
 'Data is divided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'
 
-# 'Datas is devided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'    
-# Prepare input file for the encoder
-# for pool_idx, pool in enumerate(data_pools):
-#     input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_input_{pool_idx}.txt"
-#     with open(input_file, "w") as f:
-#         for chunk in pool:
-#             f.write(chunk + "\n")
-
+# Save input message for debugging
+for pool_idx, pool in enumerate(data_pools):
+    message_input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_encode_input_{pool_idx}.txt"
+    with open(message_input_file, "w") as f:
+        for chunk in pool:
+            f.write(chunk + "\n")
 
 # =================================Encoding===================================#
 # LDPC encode
 print('LDPC encoding...')
-LDPC = LDPC_Codec(h_matrix_path="./config/Hmatrix.txt")
+LDPC = LDPC_Codec()
 # Transpose matrix for inter-oligos encoding
 data_pools = transpose_h2v(data_pools)
 'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
@@ -115,7 +118,7 @@ data_pools = transpose_h2v(data_pools)
 ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
 h_matrix_path = ".\config\Hmatrix.txt"
 
-data_pools = LDPC.encode(data_pools, ldpc_encoder_exe)
+data_pools = LDPC.encode(data_pools)
 
 # Convert each pool to a 2-D numpy array and transpose for BCH encoding
 data_pools = transpose_v2h(data_pools)
@@ -220,33 +223,30 @@ st.subheader('DNA to Binary')
 out_data_pools = DNA_pools_to_binary(coding_config,in_file_name,out_dna_pools)
 
 # ============================== BCH Decoding ============================= #
+
 BCH = BCH_Codec(decode_config = coding_config)
 out_data_pools = BCH.decode(out_data_pools)
-
 print('voting...')
 # Cluster the sequences with the same index in each pool
 out_prob_pools = [] # Store the voting results for each pool
 for pool in out_data_pools:
     voting_result = voting(pool, coding_config["Coding_param"]["outer"]["n"], coding_config["Coding_param"]["inner1"]["k"], coding_config["Coding_param"]["inner2"]["k"])
     out_prob_pools.append(voting_result) # Probability of each bit in the voting result, for LDPC decoding
+print(f'Complete!')
 
-# Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
-for pool_idx, v_score in enumerate(out_prob_pools):
-    ldpc_input_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_input_{pool_idx}.txt"
-    np.savetxt(ldpc_input_file, v_score, fmt="%.3f", delimiter=" ")
-print(f'Complete! Voting results saved to {ldpc_input_file}.')
 
 # ===================== LDPC Decoding ===================== #
-LDPC.decode(coding_config[in_file_name]["segmentation"]["pools_num"])
+LDPC = LDPC_Codec()
+LDPC.decode(out_prob_pools)
 
 # ===================== testing =====================
 # calculate the BER
-input_msg_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_input_0.txt"
-output_msg_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_0.txt"
+message_input_file = f"./Mid_data/ldpc_encode_input_0.txt"
+message_output_file = f"./Mid_data/ldpc_decode_output_0.txt"
 
 # Calculate Bit Error Rate (BER)
-def calculate_ber(input_file, output_file):
-    with open(input_file, "r") as fin, open(output_file, "r") as fout:
+def calculate_ber(message_input_file, message_output_file):
+    with open(message_input_file, "r") as fin, open(message_output_file, "r") as fout:
         input_lines = [line.strip() for line in fin]
         output_lines = [line.strip() for line in fout]
     total_bits = 0
@@ -257,9 +257,8 @@ def calculate_ber(input_file, output_file):
     ber = error_bits / total_bits if total_bits > 0 else 0
     return ber
 
-ber = calculate_ber(input_msg_file, output_msg_file)
+ber = calculate_ber(message_input_file, message_output_file)
 print(f"Bit Error Rate (BER): {ber:.6f}")
-
 
 st.header('Image Reconstruction')
 # Read decoded output to reconstruct the image
