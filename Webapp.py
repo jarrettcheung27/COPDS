@@ -36,12 +36,12 @@ save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_
 arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
 # synthesis stage
-arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 40)
+arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 50)
 arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.02) / 3 # 3 kinds of substitutions
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
 # PCR stage
-arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =10)
+arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =4)
 arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.8)
 
 # decay stage
@@ -49,19 +49,17 @@ arg.decay_er = 0
 arg.decay_loss_rate = 0.01
 
 # sequencing stage
-arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
-arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
-arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
-
 seq_platform = st.sidebar.selectbox('Sequencing Platform',['Illumina Sequencing','Nanopore'])
-
-index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
-
 if seq_platform == 'Illumina Sequencing':
     arg.seq_TM = config.TM_NGS
 else:
     arg.seq_TM = config.TM_NNP
+arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
+arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
+arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 12)
 
+# inspect index
+index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
 # ------------- file path--------------- #
 abs_dir  = "D:/COPDS-main/"
 dna_lib_dir = abs_dir + 'DNA_Library/'
@@ -134,18 +132,91 @@ encode_config['n0'] = n_0
 BCH = BCH_Codec(encode_config = encode_config)
 data_pools = BCH.encode(ids, data_pools)
 
-# ------------------encode - decode conversion-------------
-out_data_pools = []
-for pool in data_pools:
-    out_data_pool = []
-    for segment in pool:
-        ids = segment[0:encode_config['n1']]
-        data = segment[-encode_config['n2']:]
-        out_data_pool.append([ids,data,1])
-    out_data_pools.append(out_data_pool)
+#===============================Binary to DNA===============================#
+st.subheader('Binary to DNA')
+total_bits = chunk_size + k_1 + r_1 + r_2
+dna_length = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
+if (total_bits % 2) != 0:
+    is_padding = True
+else:
+    is_padding = False
+save_padding_info_bin2DNA(in_file_name, is_padding, 0) # Save padding info for binary to DNA conversion
+
+dna_pools = binary_to_dna_pools(data_pools, dna_length, is_padding, dna_pools_dir)
+
+# ============================= DNA simulation Channel ============================= #
+st.header('Error simulation of the DNA data storage channel')
+
+st.subheader('Load Data')
+Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
+
+# Run Simulation for each pool
+out_dna_pools = []
+for dnas in dna_pools:
+    out_dnas = Channel(dnas)
+    out_dna_pools.append(out_dnas)
+'Simulation completed. '
+
+
+# --------------Save Simulation results ----------------
+pools_out_file_path = os.path.join(dna_pools_dir, 'out.dna')
+temp = []
+for idx, out_dnas in enumerate(out_dna_pools):
+    # Extract simulated DNA sequences
+    dnas = extract_dnas(out_dnas)
+    # Open the file in write mode
+    with open(pools_out_file_path, "w") as file:
+        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+        json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
+    temp.append(dnas)
+out_dna_pools = temp
+print('Simulated DNAs saved to ', pools_out_file_path)
+
+
+# ===================== Read the simulated DNA ===================== #
+'''
+st.header('Decoding')
+st.subheader('Load Data')
+# Folder selection for DNA pools
+
+uploaded_dna_files = st.file_uploader(
+    "Select one or more simulated DNA pool to decode", 
+    type=["dna"], 
+    accept_multiple_files=True
+)
+# Obtain the original image file name from the selected .dna file
+file_name = ''
+if uploaded_dna_files:
+    # Use the first uploaded file as reference
+    dna_file_name = uploaded_dna_files[0].name
+    # Remove 'simu_' prefix if present and split at the last underscore
+    base_name = dna_file_name
+    if base_name.startswith('simu_'):
+        base_name = base_name[5:]
+    file_name = base_name.rsplit('_', 1)[0]
+out_file_name = file_name + '_reconstructed.jpg'    
+
+if uploaded_dna_files:
+    out_dnas_pools = []
+    strands_num = 0;
+    for uploaded_file in uploaded_dna_files:
+        dnas = uploaded_file.read().decode("utf-8").splitlines()
+        out_dnas = [dna.strip() for dna in dnas]
+        strands_num += len(out_dnas)
+        out_dnas_pools.append(out_dnas)
+    st.success(f"Loaded {strands_num} strands of length {len(out_dnas[0])} nts")
+else:
+    st.stop()
+    st.warning("No DNA files selected.")
+'''
 config_path = "./config/config.json"
 with open(config_path, 'r', encoding='utf-8') as f:
     coding_config = json.load(f)
+
+#================= DNA to Binary ====================#
+st.subheader('DNA to Binary')
+out_data_pools = DNA_pools_to_binary(coding_config,in_file_name,out_dna_pools)
+
 # ============================== BCH Decoding ============================= #
 
 BCH = BCH_Codec(decode_config = coding_config)

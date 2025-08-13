@@ -700,7 +700,7 @@ class LDPC_Codec:
             # Call LDPC decoder executable
             mode = "encode"
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
+            # print(result.stdout)  # Print the output from the LDPC decoder
             print(result.stderr)  # Print any error messages from the LDPC decoder
             # Read encoded data back
             encoded_pool = []
@@ -726,7 +726,7 @@ class LDPC_Codec:
             # Call LDPC decoder executable
             mode = "decode"
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
+            # print(result.stdout)  # Print the output from the LDPC decoder
             # print(result.stderr)  # Print any error messages from the LDPC decoder
         print('Completed!')
 
