@@ -38,7 +38,7 @@ arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
 # synthesis stage
 arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 60, value = 60)
-arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of substitutions
+# arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of errors
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
 # PCR stage
