@@ -23,7 +23,7 @@ config_path = "./config/config.json"
 # ------------ Choosing parameters -------------- # 
 st.sidebar.subheader('Coding Parameter')
 chunk_size = st.sidebar.number_input('DNA chunk size', min_value = 100, max_value = 400, value = 320)
-k_0 = st.sidebar.number_input('Block size $k_0$', min_value = 200, max_value = 2000, value = 1000)
+k_0 = st.sidebar.number_input('Block size $k_0$', min_value = 200, max_value = 8000, value = 1000)
 n_0 = st.sidebar.number_input('Outer code length $n_0$', min_value = 200, max_value = 10000, value = 1334)
 # k_0 = 1000 # Default value for k_0, LDPC code parameter
 k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 24, value = 11)
@@ -37,12 +37,12 @@ save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_
 arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
 # synthesis stage
-arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 60, value = 60)
+arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 50)
 # arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of errors
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
 # PCR stage
-arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =6)
+arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =2)
 arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.9)
 
 # decay stage
@@ -59,12 +59,13 @@ arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
 arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.01)
 arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
 
-
-
-
-
 # inspect index
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
+
+st.header('Upload file')
+# 使用file_uploader 上传多张图片
+
+
 # ------------- file path--------------- #
 abs_dir  = "D:/COPDS-main/"
 dna_lib_dir = abs_dir + 'DNA_Library/'
@@ -74,7 +75,6 @@ file_name = "Jnu_test"
 suffix = "jpg"
 out_file_path = "D:/COPDS-main/DNA_Library/" + file_name + "_re." + suffix
 dna_pools_dir = os.path.join(dna_lib_dir, 'DNA_pools-' + file_name)
-
 
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
@@ -296,7 +296,6 @@ with open(out_file_path, "wb") as f:
         f.write(chunk)
 
 st.success(f"Image reconstructed and saved as {out_file_path}")
-
 st.subheader('Quality Evaluation')
 st.image(out_file_path, width = 300)
 
