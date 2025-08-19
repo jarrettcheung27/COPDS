@@ -18,7 +18,7 @@ class DNA_Channel_Model:
                 ('Synthesis',Synthesizer(arg)),
                 ('Decay',Decayer(arg)),
                 ('PCR',PCRer(arg = arg)),
-                ('Sample',Sampler(arg = arg)),
+                # ('Sample',Sampler(arg = arg)),
                 ('Sequencing',Sequencer(arg))
             ]
 

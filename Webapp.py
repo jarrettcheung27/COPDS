@@ -32,17 +32,18 @@ k_2 = chunk_size
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
 coding_config = {"Coding_param" : {"outer": {"n": n_0, "k": k_0}, "inner1": {"n": k_1 + r_1, "k": k_1}, "inner2": {"n": k_2 + r_2, "k": k_2}}}
 save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_1), inner2 = (chunk_size + r_2, chunk_size)) # The same coding parameters are used for all images.
+
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
 st.sidebar.subheader('Parameters of DNA data storage channel')
 # synthesis stage
-arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 50, value = 40)
-arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.02) / 3 # 3 kinds of substitutions
+arg.syn_number = st.sidebar.slider('Syn number', min_value = 10, max_value = 60, value = 60)
+arg.syn_sub_prob = st.sidebar.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of substitutions
 arg.syn_yield = st.sidebar.slider('Syn Yield', min_value = 0.98, max_value = 0.995, value = 0.99)
 
 # PCR stage
-arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =8)
-arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.8)
+arg.pcrc = st.sidebar.slider('PCR cycle',min_value = 0, max_value =20,value =6)
+arg.pcrp = st.sidebar.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.9)
 
 # decay stage
 arg.decay_er = 0
@@ -55,7 +56,7 @@ if seq_platform == 'Illumina Sequencing':
 else:
     arg.seq_TM = config.TM_NNP
 arg.seq_TM = genTm(0.001) # sequencing Transform Matrix
-arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.005)
+arg.sam_ratio = st.sidebar.number_input('Sampling ratio',min_value = 0.0, max_value =1.0,value = 0.01)
 arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
 
 
@@ -258,14 +259,19 @@ def calculate_ber(message_input_file, message_output_file):
     return ber
 
 ber = calculate_ber(message_input_file, message_output_file)
-print(f"Bit Error Rate (BER): {ber:.6f}")
+print(f"Bit Error Rate (BER): {ber:.8f}")
+
 
 st.header('Image Reconstruction')
 # Read decoded output to reconstruct the image
-# Read all LDPC decoded output files and reconstruct the original data
+
+# Read the config file to obtain the configuration.
+pool_num = coding_config[in_file_name]["segmentation"]["pools_num"]
+chunk_num = coding_config[in_file_name]["segmentation"]["chunk_num"]
+pad = coding_config[in_file_name]["segmentation"]["pad"]
 decoded_chunks = []
-for pool_idx in range(len(out_prob_pools)):
-    ldpc_output_file = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\ldpc_decode_output_{pool_idx}.txt"
+for pool_idx in range(pool_num):
+    ldpc_output_file = f"./Mid_data/ldpc_decode_output_{pool_idx}.txt"
     with open(ldpc_output_file, "r") as f:
         pool_bits = [line.strip() for line in f]
         # Transpose: each line is a bit position, columns are chunks
@@ -275,17 +281,8 @@ for pool_idx in range(len(out_prob_pools)):
             chunk_bytes = bits2bytes(chunk_bits)
             decoded_chunks.append(chunk_bytes)
 
-# Read 'pad' and 'chunk_num' from the segmentation config file
-segmentation_config_path = f"D:\\DeSP-main\\App_Simulation_Platform\\Mid_data\\Segmentation_config_{file_name}.txt"
-if os.path.exists(segmentation_config_path):
-    with open(segmentation_config_path, "r") as f:
-        for line in f:
-            if line.startswith("pad="):
-                pad = int(line.strip().split("=")[1])
-            elif line.startswith("chunk_num="):
-                chunk_num = int(line.strip().split("=")[1])
 # Remove padding chunks if pad decoded_chunks number > original chunk number
-    decoded_chunks = decoded_chunks[:chunk_num]
+decoded_chunks = decoded_chunks[:chunk_num]
 
 # Remove padding bytes in the last chunk if pad > 0
 if pad > 0:
@@ -301,7 +298,7 @@ with open(out_file_path, "wb") as f:
 st.success(f"Image reconstructed and saved as {out_file_path}")
 
 st.subheader('Quality Evaluation')
-# st.image(out_file_path, width = 300)
+st.image(out_file_path, width = 300)
 
 # ------------------------ optimizing ----------------------------- #
 '''
