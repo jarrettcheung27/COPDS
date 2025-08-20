@@ -11,12 +11,14 @@ import streamlit as st
 import subprocess
 import numpy as np
 import json
+from PIL import Image
+import uuid
 
 # ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
-
 config_path = "./config/config.json"
+dna_lib_dir = "./DNA_Library/"
 
 # =========================== assigning parameters ========================= #
 
@@ -64,17 +66,50 @@ index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
 
 st.header('Upload file')
 # 使用file_uploader 上传多张图片
+uploaded_files = st.file_uploader(
+    "Select images to store in DNA",
+    type=["jpg", "jpeg", "png"],
+    accept_multiple_files=True,
+    key="file_uploader"
+)
+if uploaded_files is not None:
+    for uploaded_file in uploaded_files:
+        # 使用 PIL 打开图片
+        image = Image.open(uploaded_file)
+        st.image(image, caption="上传的图片", width=100)
 
+# If no files are uploaded, use a default image
+if not st.session_state.get("file_uploader"):
+    # Use a default image if no files are uploaded
+    default_image_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
+    st.session_state["file_uploader"] = [default_image_path]
 
-# ------------- file path--------------- #
-abs_dir  = "D:/COPDS-main/"
-dna_lib_dir = abs_dir + 'DNA_Library/'
-in_file_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
-in_file_name= "Jnu_test.jpg"
-file_name = "Jnu_test"
-suffix = "jpg"
-out_file_path = "D:/COPDS-main/DNA_Library/" + file_name + "_re." + suffix
-dna_pools_dir = os.path.join(dna_lib_dir, 'DNA_pools-' + file_name)
+# Initialize coding configuration
+coding_config = {'files': {
+                    'num': 0},
+                 'ECC': {},
+                 'DNA2Binary': {}
+                 }
+image_ids = [str(uuid.uuid4()) for _ in range(len(uploaded_files))]  # Generate unique IDs for each image
+image_names = [file.name for file in uploaded_files]  # Get the names of the uploaded files
+name_to_id_mapping = {image_names[i]: image_ids[i] for i in range(len(uploaded_files))}
+
+for i, file in enumerate(uploaded_files):
+    coding_config['files'][i] = {
+        "id": image_ids[i],
+        "file_name": file.name,
+        "file_type": file.type,
+        "suffix": file.name.split('.')[-1],
+        "file_size": file.size,
+        "segmentation": {
+            "chunk_num": 0,
+            "block_num": 0,
+            "pad_size": 0
+        }
+    }
+coding_config['files']["num"] = len(uploaded_files)
+print(coding_config)
+
 
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
@@ -82,60 +117,81 @@ print('\n ==================== DNA 存储仿真平台 ==================== ')
 os.makedirs(dna_lib_dir, exist_ok=True)
 
 # =====================Segmentation==================== #
+# 数据分层结构 Library->pool(image)->block(coding unit)->chunk(dna)
 st.subheader('Segmentation')
+total_chunk = 0
+Library = []
+for i, file in enumerate(uploaded_files):
+    block, pad_size = split_image(file, chunk_size)
+    total_chunk += len(block)
+    # bytes to bits
+    block = [bytes2bits(chunk) for chunk in block]
+    coding_config['files'][i]['segmentation']['chunk_num'] = len(block)
+    # Split data into pools of size k_0 (1000), pad the last pool if needed
+    pool = split_data(block, block_size=k_0, chunk_size=chunk_size)
+    coding_config['files'][i]['segmentation']['block_num'] = len(pool)
+    coding_config['files'][i]['segmentation']['pad_size'] = pad_size
 
-data,pad = preprocess(in_file_path,int(chunk_size/8))
-'Images loaded and split into ', len(data), ' data chunks.'
-
-# =====================Binary to bits===================#
-# bytes to bits
-data = [bytes2bits(chunk) for chunk in data]
-
-# ========================Splitting=======================#
-# Split data into pools of size k_0 (1000), pad the last pool if needed
-
-data_pools = split_data(data, pool_size=k_0, chunk_size=chunk_size)
-pools_num = len(data_pools)
-
-save_config_segmentation(in_file_name, pools_num, len(data), pad)
-'Data is divided into', len(data_pools), ' pools of size ', len(data_pools[0]), ' chunks.'
-
+    Library.append(pool)
+print('Images loaded and split into ', total_chunk, ' data chunks.')
+print('config:', coding_config)
 # Save input message for debugging
+'''
 for pool_idx, pool in enumerate(data_pools):
     message_input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_encode_input_{pool_idx}.txt"
     with open(message_input_file, "w") as f:
         for chunk in pool:
             f.write(chunk + "\n")
+'''
 
-# =================================Encoding===================================#
-# LDPC encode
-print('LDPC encoding...')
-LDPC = LDPC_Codec()
-# Transpose matrix for inter-oligos encoding
-data_pools = transpose_h2v(data_pools)
-'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
+print('Processing Encode...')
+temp = []
+for pool in Library:
+    # =================================Encoding===================================#
+    # ---------------------Save configuration---------------------
+    coding_config['ECC'] = {
+        "outer": {
+            "n": n_0,
+            "k": k_0,
+            "h_matrix_path": ".\config\Hmatrix.txt",
+            "ldpc_encoder_exe": ".\Encode\LDPC_PEG-v2.0.exe"
+        },
+        "inner1": {
+            "n": k_1 + r_1,
+            "k": k_1
+        },
+        "inner2": {
+            "n": chunk_size + r_2,
+            "k": chunk_size
+        }
+    }
 
-# Path to the LDPC encoder executable and H matrix
-ldpc_encoder_exe = ".\Encode\LDPC_PEG-v2.0.exe"
-h_matrix_path = ".\config\Hmatrix.txt"
+    # LDPC encode
+    # print('LDPC encoding...')
+    LDPC = LDPC_Codec()
+    # Transpose matrix for inter-oligos encoding
+    pool = transpose_h2v(pool)
+    'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
 
-data_pools = LDPC.encode(data_pools)
+    # Path to the LDPC encoder executable and H matrix
+    pool = LDPC.encode(pool)
 
-# Convert each pool to a 2-D numpy array and transpose for BCH encoding
-data_pools = transpose_v2h(data_pools)
+    # Convert each pool to a 2-D numpy array and transpose for BCH encoding
+    pool = transpose_v2h(pool)
 
-# -----------------------Indexing-----------------------
-ids  = np.array([int_to_binary_array(id, k_1) for id in range(n_0)])
+    # -----------------------Indexing-----------------------
+    ids  = np.array([int_to_binary_array(id, k_1) for id in range(n_0)])
 
-# ----------------------BCH encode----------------------
-encode_config = {}
-encode_config['n1'] = k_1 + r_1
-encode_config['k1'] = k_1
-encode_config['n2'] = chunk_size + r_2
-encode_config['k2'] = chunk_size
-encode_config['n0'] = n_0
-BCH = BCH_Codec(encode_config = encode_config)
-data_pools = BCH.encode(ids, data_pools)
+    # ----------------------BCH encode----------------------
+    BCH = BCH_Codec(coding_config = coding_config)
+    pool = BCH.encode(ids, pool)
+    temp.append(pool)
+Library = temp
+print('Encoding completed.')
+print('config:', coding_config)
+print(len(Library), 'pools generated.')
+for i, pool in enumerate(Library):
+    print(f'Pool {i}: {len(pool)} blocks')
 
 #===============================Binary to DNA===============================#
 st.subheader('Binary to DNA')
@@ -266,9 +322,9 @@ st.header('Image Reconstruction')
 # Read decoded output to reconstruct the image
 
 # Read the config file to obtain the configuration.
-pool_num = coding_config[in_file_name]["segmentation"]["pools_num"]
+pool_num = coding_config[in_file_name]["segmentation"]["block_num"]
 chunk_num = coding_config[in_file_name]["segmentation"]["chunk_num"]
-pad = coding_config[in_file_name]["segmentation"]["pad"]
+pad_size = coding_config[in_file_name]["segmentation"]["pad_size"]
 decoded_chunks = []
 for pool_idx in range(pool_num):
     ldpc_output_file = f"./Mid_data/ldpc_decode_output_{pool_idx}.txt"
@@ -284,11 +340,11 @@ for pool_idx in range(pool_num):
 # Remove padding chunks if pad decoded_chunks number > original chunk number
 decoded_chunks = decoded_chunks[:chunk_num]
 
-# Remove padding bytes in the last chunk if pad > 0
-if pad > 0:
+# Remove padding bytes in the last chunk if pad_size > 0
+if pad_size > 0:
     last_chunk = decoded_chunks[-1]
-    if len(last_chunk) > pad:
-        decoded_chunks[-1] = last_chunk[:-pad]  # Remove padding bytes from the last chunk 
+    if len(last_chunk) > pad_size:
+        decoded_chunks[-1] = last_chunk[:-pad_size]  # Remove padding bytes from the last chunk 
 
 # Save reconstructed image
 with open(out_file_path, "wb") as f:

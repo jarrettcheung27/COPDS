@@ -85,27 +85,39 @@ def load_dna(file_name):
     in_dnas = [dna.split('\n')[0] for dna in dnas]
     return in_dnas
 
-def split_data(data, pool_size, chunk_size):
+def split_data(data, block_size, chunk_size):
     """
-    Split data into pools of size pool_size.
-    If the last pool is smaller than pool_size, pad it with random bits.
+    Split data into blocks of size block_size.
+    If the last block is smaller than block_size, pad it with random bits.
     Input:
     - data: List of bit strings (each string is a chunk of bits)
-    - pool_size: Size of each pool
+    - block_size: Size of each block
     Output:
-    - data_pools: List of pools, each pool is a list of bit strings
+    - pool: List of blocks, each block is a list of bit strings
     """
-    data_pools = []
-    for i in range(0, len(data), pool_size):
-        pool = data[i:i+pool_size]
-        # If last pool is smaller than pool_size, pad with random bits
-        if len(pool) < pool_size:
-            chunk_len = len(pool[0]) if pool else chunk_size
-            for _ in range(pool_size - len(pool)):
+    pool = []
+    for i in range(0, len(data), block_size):
+        block = data[i:i+block_size]
+        # If last block is smaller than block_size, pad with random bits
+        if len(block) < block_size:
+            chunk_len = len(block[0]) if block else chunk_size
+            for _ in range(block_size - len(block)):
                 random_bits = ''.join(random.choice('01') for _ in range(chunk_len))
-                pool.append(random_bits)
-        data_pools.append(pool)
-    return data_pools
+                block.append(random_bits)
+        pool.append(block)
+    return pool
+def split_image(file, chunk_size):
+    # 将图片按 chunk_size/8 字节切分为若干 chunk，最后一块不足则用 0x00 补齐
+    chunk_byte_len = chunk_size // 8  # 每个 DNA chunk 对应的字节数
+    file.seek(0)                      # 确保从文件开头读取其原始二进制（而不是原始像素）
+    file_bytes = file.read()          # 使用原始文件字节（保持格式，如 jpg/png）
+    total_len = len(file_bytes)
+    remainder = total_len % chunk_byte_len
+    pad_size = (chunk_byte_len - remainder) if remainder != 0 else 0
+    if pad_size:
+        file_bytes += b'\x00' * pad_size
+    block = [file_bytes[i:i + chunk_byte_len] for i in range(0, len(file_bytes), chunk_byte_len)]
+    return block, pad_size
 
 # Save segmentation configuration for later reconstruction
 def save_config_segmentation(in_file_name, pools_num, chunk_num, pad):
@@ -612,23 +624,15 @@ def effective_reduandancy(r_theory, k):
     return r
 
 class BCH_Codec:
-    def __init__(self, encode_config = None, decode_config = None):
-        if encode_config is None:
-            self.n1 = decode_config["Coding_param"]["inner1"]["n"]
-            self.k1 = decode_config["Coding_param"]["inner1"]["k"]
-            self.k2 = decode_config["Coding_param"]["inner2"]["k"]
-            self.n2 = decode_config["Coding_param"]["inner2"]["n"]
-            self.n0 = decode_config["Coding_param"]["outer"]["n"]
-        else:
-            self.n1 = encode_config["n1"]
-            self.k1 = encode_config["k1"]
-            self.k2 = encode_config["k2"]
-            self.n2 = encode_config["n2"]
-            self.n0 = encode_config["n0"]
-
+    def __init__(self, coding_config = None):
+        self.n1 = coding_config["ECC"]["inner1"]["n"]
+        self.k1 = coding_config["ECC"]["inner1"]["k"]
+        self.k2 = coding_config["ECC"]["inner2"]["k"]
+        self.n2 = coding_config["ECC"]["inner2"]["n"]
+        self.n0 = coding_config["ECC"]["outer"]["n"]
 
     def encode(self, ids, data_pools):
-        print("BCH encoding...")
+        # print("BCH encoding...")
         matlab_engine = matlab.engine.start_matlab()
         matlab_engine.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
         eng = matlab_engine
@@ -639,10 +643,10 @@ class BCH_Codec:
             # Encode information bit by BCH encoder.
             cwr_data = eng.BCH_Encoder(self.n2, self.k2, self.n0, pool)
             data_pools[pool_idx] = np.concatenate((cwr_ids, cwr_data), axis=1)
-        print("BCH encode completed.")
+        # print("BCH encode completed.")
         return data_pools
     def decode(self, out_data_pools):
-        print('BCH Decoding...')
+        # print('BCH Decoding...')
         # Decode each pool
         eng = matlab.engine.start_matlab()
         eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
@@ -659,7 +663,7 @@ class BCH_Codec:
                 temp.append((temp_id, temp_data, pool[i][2])) # Store the id, information part and counts
             temp_pools.append(temp)
         out_data_pools  = temp_pools
-        print('BCH decode completed.')
+        # print('BCH decode completed.')
         return out_data_pools
 #----------------------LDPC----------------------------#
 class LDPC_Codec:
@@ -716,7 +720,7 @@ class LDPC_Codec:
         Input:
         - segment_num: Number of segments (pools) to decode 
         """
-        print('LDPC Decoding...')
+        # print('LDPC Decoding...')
         # Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
         for pool_idx, v_score in enumerate(out_prob_pools):
             input_file = self.mid_data_folder + f"ldpc_decode_input_{pool_idx}.txt"
@@ -728,7 +732,7 @@ class LDPC_Codec:
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
             # print(result.stdout)  # Print the output from the LDPC decoder
             print(result.stderr)  # Print any error messages from the LDPC decoder
-        print('Completed!')
+        # print('Completed!')
 
 def transpose_v2h(data_pools):
     """
