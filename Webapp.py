@@ -85,18 +85,17 @@ if not st.session_state.get("file_uploader"):
     st.session_state["file_uploader"] = [default_image_path]
 
 # Initialize coding configuration
-coding_config = {'files': {
-                    'num': 0},
+coding_config = {'file_num':0,
+                 'files': {},
                  'ECC': {},
                  'DNA2Binary': {}
                  }
-image_ids = [str(uuid.uuid4()) for _ in range(len(uploaded_files))]  # Generate unique IDs for each image
-image_names = [file.name for file in uploaded_files]  # Get the names of the uploaded files
-name_to_id_mapping = {image_names[i]: image_ids[i] for i in range(len(uploaded_files))}
+file_ids = [str(uuid.uuid4()) for _ in range(len(uploaded_files))]  # Generate unique IDs for each image
+file_names = [file.name for file in uploaded_files]  # Get the names of the uploaded files
+name_to_id_mapping = {file_names[i]: file_ids[i] for i in range(len(uploaded_files))}
 
 for i, file in enumerate(uploaded_files):
-    coding_config['files'][i] = {
-        "id": image_ids[i],
+    coding_config['files'][file_ids[i]] = {
         "file_name": file.name,
         "file_type": file.type,
         "suffix": file.name.split('.')[-1],
@@ -107,7 +106,7 @@ for i, file in enumerate(uploaded_files):
             "pad_size": 0
         }
     }
-coding_config['files']["num"] = len(uploaded_files)
+coding_config['file_num'] = len(uploaded_files)
 print(coding_config)
 
 
@@ -126,11 +125,11 @@ for i, file in enumerate(uploaded_files):
     total_chunk += len(block)
     # bytes to bits
     block = [bytes2bits(chunk) for chunk in block]
-    coding_config['files'][i]['segmentation']['chunk_num'] = len(block)
+    coding_config['files'][file_ids[i]]['segmentation']['chunk_num'] = len(block)
     # Split data into pools of size k_0 (1000), pad the last pool if needed
     pool = split_data(block, block_size=k_0, chunk_size=chunk_size)
-    coding_config['files'][i]['segmentation']['block_num'] = len(pool)
-    coding_config['files'][i]['segmentation']['pad_size'] = pad_size
+    coding_config['files'][file_ids[i]]['segmentation']['block_num'] = len(pool)
+    coding_config['files'][file_ids[i]]['segmentation']['pad_size'] = pad_size
 
     Library.append(pool)
 print('Images loaded and split into ', total_chunk, ' data chunks.')
@@ -204,7 +203,7 @@ coding_config['DNA2Binary'] = {
 }
 DNA_Library = []
 for i, pool in enumerate(Library):
-    dna_pool_filename = os.path.join(dna_lib_dir, f"{coding_config['files'][i]['id']}_in.dna")
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_in.dna")
     temp = binary_to_dna_pools(pool, dna_length, is_padding, dna_pool_filename)
     DNA_Library.append(temp)
 print('Binary to DNA conversion completed.')
@@ -230,8 +229,9 @@ print('Simulation completed.')
 
 
 # --------------Save Simulation results ----------------
+file_ids = list(coding_config['files'].keys())
 for i, pool in enumerate(DNA_Library):
-    dna_pool_filename = os.path.join(dna_lib_dir, f"{coding_config['files'][i]['id']}_out.dna")
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_out.dna")
     temp = []
     for idx, out_dnas in enumerate(pool):
         # Extract simulated DNA sequences
@@ -287,9 +287,30 @@ else:
     st.warning("No DNA files selected.")
 '''
 
+# ===================== Load the configuration file ===================== #
 config_path = "./config/config.json"
 with open(config_path, 'r', encoding='utf-8') as f:
     coding_config = json.load(f)
+file_ids = list(coding_config['files'].keys())
+# ===================== Select file to decode and restore===================== #
+st.header('Select file to decode')
+store_file_num = coding_config['file_num']
+
+if store_file_num == 0:
+    st.warning("No files are stored in the DNA Library. Please upload files first.")
+    st.stop()
+else:
+    file_names = [coding_config['files'][id]['file_name'] for id in file_ids]
+    file_ids = list(coding_config['files'].keys())
+    out_file_names = st.multiselect(
+        "Select files to restore",
+        options=file_names,
+        default=file_names[0]  # Default to the first file
+    )
+# -------------- obtain the IDs of the selected files --------------
+out_file_ids = [file_ids[i] for i, name in enumerate(file_names) if name in out_file_names]
+print(f'Selected files: {out_file_names}, IDs: {out_file_ids}')
+
 
 #================= DNA to Binary ====================#
 st.subheader('DNA to Binary')

@@ -1,8 +1,7 @@
 {
+    "file_num": 3,
     "files": {
-        "num": 2,
-        "0": {
-            "id": "1fe24800-2815-428b-b256-7abc52c9f7a3",
+        "1803ecb6-7643-4706-881f-5ea4871fb49f": {
             "file_name": "Jnu.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -13,8 +12,18 @@
                 "pad_size": 12
             }
         },
-        "1": {
-            "id": "851be082-3e49-4450-9b0f-73c009f3c1df",
+        "39c7894f-ae60-4d84-b68b-57f79b3a881c": {
+            "file_name": "Jnu_test.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 28194,
+            "segmentation": {
+                "chunk_num": 705,
+                "block_num": 1,
+                "pad_size": 6
+            }
+        },
+        "0a30b843-78d6-4864-9eaa-d0808fc46b03": {
             "file_name": "webapp.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -45,5 +54,19 @@
     "DNA2Binary": {
         "is_padding": true,
         "padding": 0
+    },
+    "Coding_param": {
+        "outer": {
+            "n": 1334,
+            "k": 1000
+        },
+        "inner1": {
+            "n": 26,
+            "k": 11
+        },
+        "inner2": {
+            "n": 419,
+            "k": 320
+        }
     }
 }
