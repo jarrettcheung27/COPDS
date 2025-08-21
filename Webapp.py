@@ -216,31 +216,38 @@ with open(config_path, "w") as f:
 print('Coding configuration saved to:', config_path)
 # ============================= DNA simulation Channel ============================= #
 st.header('Error simulation of the DNA data storage channel')
-
 st.subheader('Load Data')
 Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
 
-# Run Simulation for each pool
-out_dna_pools = []
-for dnas in dna_pools:
-    out_dnas = Channel(dnas)
-    out_dna_pools.append(out_dnas)
-'Simulation completed. '
+for i, dna_pools in enumerate(DNA_Library):
+    # Run Simulation for each pool
+    temp = []
+    for dnas in dna_pools:
+        out_dnas = Channel(dnas)
+        temp.append(out_dnas)
+    DNA_Library[i] = temp
+print('Simulation completed.')
 
 
 # --------------Save Simulation results ----------------
-pools_out_file_path = os.path.join(dna_pools_dir, 'out.dna')
-temp = []
-for idx, out_dnas in enumerate(out_dna_pools):
-    # Extract simulated DNA sequences
-    dnas = extract_dnas(out_dnas)
-    # Open the file in write mode
-    with open(pools_out_file_path, "w") as file:
-        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-        json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
+for i, pool in enumerate(DNA_Library):
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{coding_config['files'][i]['id']}_out.dna")
+    temp = []
+    for idx, out_dnas in enumerate(pool):
+        # Extract simulated DNA sequences
+        dnas = extract_dnas(out_dnas)
+        # Open the file in write mode
+        if idx == 0:
+            with open(dna_pool_filename, "w") as file:
+                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+        else:   
+            # Append DNA sequences to the existing file
+            with open(dna_pool_filename, "a") as file:
+                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
     temp.append(dnas)
-out_dna_pools = temp
-print('Simulated DNAs saved to ', pools_out_file_path)
+    DNA_Library[i] = temp
+print('Simulated DNAs saved to ', dna_lib_dir)
 
 
 # ===================== Read the simulated DNA ===================== #
