@@ -431,7 +431,7 @@ def int_to_binary_array(number, length):
     binary_array = [float(int(bit)) for bit in padded_binary_str]
     
     return np.array(binary_array)
-def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pools_dir):
+def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pool_filename):
     """
     Convert binary codewords to DNA sequences pools.
     Each codeword is a binary array, and each pool is a list of codewords.
@@ -453,16 +453,17 @@ def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pools_dir):
         dna_pools.append(dnas)
     
     # ------------ Save DNAs to files --------------- #
-    # Create a subfolder in DNA_Library named as "<image_name> DNA pools"
-    os.makedirs(dna_pools_dir, exist_ok=True)
-    # Save DNA pools to a .dna file, with different key for each pool
-    pools_in_file_name = os.path.join(dna_pools_dir, 'in.dna')
+    # Check if the directory exists, if not, create it
+
     for idx, dnas in enumerate(dna_pools):
-        # Open the file in write mode
-        with open(pools_in_file_name, "w") as file:
-            # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-            json.dump({f"pool{idx}": dnas}, file, ensure_ascii=False, indent=2)
-    print('Synthesised DNAs saved to ', pools_in_file_name)
+        if idx == 0:
+            with open(dna_pool_filename, "w") as file:
+                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+                json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+        else:
+            with open(dna_pool_filename, "a") as file: # 后续的block 使用追加写入
+                # Append DNA sequences to the existing file
+                json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
     return dna_pools
 
 def DNA_pools_to_binary(coding_config, in_file_name, out_dna_pools):
@@ -637,7 +638,7 @@ class BCH_Codec:
         matlab_engine.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
         eng = matlab_engine
         # Encode index by BCH encoder.
-        st.text('BCH encoding...')
+        # st.text('BCH encoding...')
         cwr_ids = eng.BCH_Encoder(self.n1, self.k1, self.n0, ids)
         for pool_idx, pool in enumerate(data_pools):
             # Encode information bit by BCH encoder.

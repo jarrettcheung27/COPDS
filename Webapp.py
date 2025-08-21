@@ -144,46 +144,42 @@ for pool_idx, pool in enumerate(data_pools):
             f.write(chunk + "\n")
 '''
 
+# -----------------------Indexing-----------------------
+ids  = np.array([int_to_binary_array(id, k_1) for id in range(n_0)])
+
+# =================================Encoding===================================#
 print('Processing Encode...')
+# ---------------------Save configuration---------------------
+coding_config['ECC'] = {
+    "outer": {
+        "n": n_0,
+        "k": k_0,
+        "h_matrix_path": ".\config\Hmatrix.txt",
+        "ldpc_encoder_exe": ".\Encode\LDPC_PEG-v2.0.exe"
+    },
+    "inner1": {
+        "n": k_1 + r_1,
+        "k": k_1
+    },
+    "inner2": {
+        "n": chunk_size + r_2,
+        "k": chunk_size
+    }
+}
+LDPC = LDPC_Codec()
+BCH = BCH_Codec(coding_config = coding_config)
 temp = []
 for pool in Library:
-    # =================================Encoding===================================#
-    # ---------------------Save configuration---------------------
-    coding_config['ECC'] = {
-        "outer": {
-            "n": n_0,
-            "k": k_0,
-            "h_matrix_path": ".\config\Hmatrix.txt",
-            "ldpc_encoder_exe": ".\Encode\LDPC_PEG-v2.0.exe"
-        },
-        "inner1": {
-            "n": k_1 + r_1,
-            "k": k_1
-        },
-        "inner2": {
-            "n": chunk_size + r_2,
-            "k": chunk_size
-        }
-    }
-
     # LDPC encode
-    # print('LDPC encoding...')
-    LDPC = LDPC_Codec()
     # Transpose matrix for inter-oligos encoding
     pool = transpose_h2v(pool)
-    'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
+    # 'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
 
     # Path to the LDPC encoder executable and H matrix
     pool = LDPC.encode(pool)
-
     # Convert each pool to a 2-D numpy array and transpose for BCH encoding
     pool = transpose_v2h(pool)
-
-    # -----------------------Indexing-----------------------
-    ids  = np.array([int_to_binary_array(id, k_1) for id in range(n_0)])
-
     # ----------------------BCH encode----------------------
-    BCH = BCH_Codec(coding_config = coding_config)
     pool = BCH.encode(ids, pool)
     temp.append(pool)
 Library = temp
@@ -195,16 +191,25 @@ for i, pool in enumerate(Library):
 
 #===============================Binary to DNA===============================#
 st.subheader('Binary to DNA')
+print('Binary to DNA...')
 total_bits = chunk_size + k_1 + r_1 + r_2
 dna_length = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
 if (total_bits % 2) != 0:
     is_padding = True
 else:
     is_padding = False
-save_padding_info_bin2DNA(in_file_name, is_padding, 0) # Save padding info for binary to DNA conversion
-
-dna_pools = binary_to_dna_pools(data_pools, dna_length, is_padding, dna_pools_dir)
-
+coding_config['DNA2Binary'] = {
+    "is_padding": is_padding,
+    "padding": 0,
+}
+DNA_Library = []
+for i, pool in enumerate(Library):
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{coding_config['files'][i]['id']}_in.dna")
+    temp = binary_to_dna_pools(pool, dna_length, is_padding, dna_pool_filename)
+    DNA_Library.append(temp)
+print('Binary to DNA conversion completed.')
+print('DNA pools saved to:', dna_lib_dir)
+print(len(DNA_Library), 'DNA pools generated.')
 # ============================= DNA simulation Channel ============================= #
 st.header('Error simulation of the DNA data storage channel')
 
