@@ -209,7 +209,11 @@ for i, pool in enumerate(Library):
     DNA_Library.append(temp)
 print('Binary to DNA conversion completed.')
 print('DNA pools saved to:', dna_lib_dir)
-print(len(DNA_Library), 'DNA pools generated.')
+
+# ==================Save coding configuration================= #
+with open(config_path, "w") as f:
+    json.dump(coding_config, f, indent=4, ensure_ascii=False)
+print('Coding configuration saved to:', config_path)
 # ============================= DNA simulation Channel ============================= #
 st.header('Error simulation of the DNA data storage channel')
 

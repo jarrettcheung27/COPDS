@@ -1,19 +1,37 @@
 {
-    "Jnu_test.jpg": {
-        "segmentation": {
-            "pools_num": 1,
-            "chunk_num": 705,
-            "pad": 6
+    "files": {
+        "num": 2,
+        "0": {
+            "id": "1fe24800-2815-428b-b256-7abc52c9f7a3",
+            "file_name": "Jnu.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 96708,
+            "segmentation": {
+                "chunk_num": 2418,
+                "block_num": 3,
+                "pad_size": 12
+            }
         },
-        "Bin2DNA": {
-            "is_padding": true,
-            "padding": 0
+        "1": {
+            "id": "851be082-3e49-4450-9b0f-73c009f3c1df",
+            "file_name": "webapp.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 668067,
+            "segmentation": {
+                "chunk_num": 16702,
+                "block_num": 17,
+                "pad_size": 13
+            }
         }
     },
-    "Coding_param": {
+    "ECC": {
         "outer": {
             "n": 1334,
-            "k": 1000
+            "k": 1000,
+            "h_matrix_path": ".\\config\\Hmatrix.txt",
+            "ldpc_encoder_exe": ".\\Encode\\LDPC_PEG-v2.0.exe"
         },
         "inner1": {
             "n": 26,
@@ -23,5 +41,9 @@
             "n": 419,
             "k": 320
         }
+    },
+    "DNA2Binary": {
+        "is_padding": true,
+        "padding": 0
     }
 }

@@ -139,7 +139,6 @@ def save_config_segmentation(in_file_name, pools_num, chunk_num, pad):
     else:
         config_data = {}
     # Update segmentation config with current image info
-
     config_data[in_file_name]["segmentation"] = {"pools_num": pools_num, "chunk_num": chunk_num, "pad": pad}
 
     # Write back to config file in JSON format
