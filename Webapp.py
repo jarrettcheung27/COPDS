@@ -63,6 +63,7 @@ arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, v
 
 # inspect index
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
+
 st.header('Upload file')
 # 使用file_uploader 上传多张图片
 uploaded_files = st.file_uploader(
@@ -207,42 +208,6 @@ for i, pool in enumerate(Library):
     DNA_Library.append(temp)
 print('Binary to DNA conversion completed.')
 print('DNA pools saved to:', dna_lib_dir)
-
-# ==================Save coding configuration================= #
-with open(config_path, "w") as f:
-    json.dump(coding_config, f, indent=4, ensure_ascii=False)
-print('Coding configuration saved to:', config_path)
-# ============================= DNA simulation Channel ============================= #
-st.header('Error simulation of the DNA data storage channel')
-st.subheader('Load Data')
-Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
-
-for i, dna_pools in enumerate(DNA_Library):
-    # Run Simulation for each pool
-    temp = []
-    for dnas in dna_pools:
-        out_dnas = Channel(dnas)
-        temp.append(out_dnas)
-    DNA_Library[i] = temp
-print('Simulation completed.')
-
-
-# --------------Save Simulation results ----------------
-file_ids = list(coding_config['files'].keys())
-for i, pool in enumerate(DNA_Library):
-    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_out.dna")
-    temp = []
-    DNA_pool_json = {}
-    for idx, out_dnas in enumerate(pool):
-        # Extract simulated DNA sequences
-        dnas = extract_dnas(out_dnas)
-        DNA_pool_json[f"chunk_{idx}"] = dnas
-    with open(dna_pool_filename, "w") as file:
-        json.dump(DNA_pool_json, file, ensure_ascii=False, indent=2)
-    temp.append(dnas)
-    DNA_Library[i] = temp
-print('Simulated DNAs saved to ', dna_lib_dir)
-
 # ===================== Load the configuration file ===================== #
 config_path = "./config/config.json"
 with open(config_path, 'r', encoding='utf-8') as f:
@@ -279,7 +244,7 @@ for file_id in out_file_ids:
         out_dna_pool.append(DNA_pool[f'chunk_{i}'])
         strands_num += len(DNA_pool[f'chunk_{i}'])
     DNA_Library.append(out_dna_pool)
-st.success(f"Loaded {strands_num} strands of length {len(out_dna_pool[0])} nts")
+st.success(f"Loaded {strands_num} strands of length {chunk_size} nts")
 
 #================= DNA to Binary ====================#
 st.subheader('DNA to Binary')
@@ -292,44 +257,20 @@ print('DNA to binary conversion completed.')
 print('Number of pools:', len(Library))
 print('Number of blocks in each pool:', [len(pool) for pool in Library])
 
-# ============================== BCH Decoding ============================= #
-
-BCH = BCH_Codec(decode_config = coding_config)
-out_data_pools = BCH.decode(out_data_pools)
-print('voting...')
-# Cluster the sequences with the same index in each pool
-out_prob_pools = [] # Store the voting results for each pool
-for pool in out_data_pools:
-    voting_result = voting(pool, coding_config["Coding_param"]["outer"]["n"], coding_config["Coding_param"]["inner1"]["k"], coding_config["Coding_param"]["inner2"]["k"])
-    out_prob_pools.append(voting_result) # Probability of each bit in the voting result, for LDPC decoding
-print(f'Complete!')
-
-
-# ===================== LDPC Decoding ===================== #
-LDPC = LDPC_Codec()
-LDPC.decode(out_prob_pools)
-
-# ===================== testing =====================
-# calculate the BER
-message_input_file = f"./Mid_data/ldpc_encode_input_0.txt"
-message_output_file = f"./Mid_data/ldpc_decode_output_0.txt"
-
-# Calculate Bit Error Rate (BER)
-def calculate_ber(message_input_file, message_output_file):
-    with open(message_input_file, "r") as fin, open(message_output_file, "r") as fout:
-        input_lines = [line.strip() for line in fin]
-        output_lines = [line.strip() for line in fout]
-    total_bits = 0
-    error_bits = 0
-    for in_bits, out_bits in zip(input_lines, output_lines):
-        total_bits += len(in_bits)
-        error_bits += sum(b1 != b2 for b1, b2 in zip(in_bits, out_bits))
-    ber = error_bits / total_bits if total_bits > 0 else 0
-    return ber
-
-ber = calculate_ber(message_input_file, message_output_file)
-print(f"Bit Error Rate (BER): {ber:.8f}")
-
+print('Voting and decoding...')
+for i, pool in enumerate(Library):
+    # ============================== BCH Decoding ============================= #
+    BCH = BCH_Codec(coding_config = coding_config)
+    pool = BCH.decode(pool)
+    # Cluster the sequences with the same index in each pool
+    prob_pool = [] # Store the voting results for each pool
+    for chunk in pool:
+        temp = voting(chunk, coding_config["Coding_param"]["outer"]["n"], coding_config["Coding_param"]["inner1"]["k"], coding_config["Coding_param"]["inner2"]["k"])
+        prob_pool.append(temp) # Probability of each bit in the voting result, for LDPC decoding
+    # ===================== LDPC Decoding ===================== #
+    LDPC = LDPC_Codec()
+    LDPC.decode(prob_pool,file_id=file_ids[i])
+print('LDPC decoding completed.')
 
 st.header('Image Reconstruction')
 # Read decoded output to reconstruct the image

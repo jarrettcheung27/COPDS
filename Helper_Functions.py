@@ -714,7 +714,7 @@ class LDPC_Codec:
             encoded_data_pools.append(encoded_pool)
         return encoded_data_pools
 
-    def decode(self, out_prob_pools):
+    def decode(self, out_prob_pools,file_id):
         """
         Decode the input data using LDPC decoding.
         Input:
@@ -722,9 +722,9 @@ class LDPC_Codec:
         """
         # print('LDPC Decoding...')
         # Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
-        for pool_idx, v_score in enumerate(out_prob_pools):
-            input_file = self.mid_data_folder + f"ldpc_decode_input_{pool_idx}.txt"
-            output_file = self.mid_data_folder + f"ldpc_decode_output_{pool_idx}.txt"
+        for chunk_id, v_score in enumerate(out_prob_pools):
+            input_file = self.mid_data_folder + f"{file_id}_decode_in_{chunk_id}.txt"
+            output_file = self.mid_data_folder + f"{file_id}_decode_out_{chunk_id}.txt"
             
             np.savetxt(input_file, v_score, fmt="%.3f", delimiter=" ")
             # Call LDPC decoder executable
