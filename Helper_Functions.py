@@ -465,22 +465,22 @@ def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pool_filename):
                 json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
     return dna_pools
 
-def DNA_pools_to_binary(coding_config, in_file_name, out_dna_pools):
+def DNA_pools_to_binary(coding_config, dna_pool):
     print('DNA to binary...')
     out_data_pools = []
     # separate index and information part
-    for out_dnas in out_dna_pools:
-        temp_dnas = [] # Temporary dictionary to store DNA {id, information part, counts}.
-        for dna, num in out_dnas.items():
+    for chunk in dna_pool:
+        temp = [] # Temporary dictionary to store DNA {id, information part, counts}.
+        for dna, num in chunk.items():
             dna = dna.strip()
             binary = dna_to_bin_array(dna) # Convert DNA to binary array
-            id = binary[:coding_config["Coding_param"]["inner1"]["n"]] # Extract index part
-            if coding_config[in_file_name]["Bin2DNA"]["is_padding"]: # Extract information part, remove padding bit if exists
-                inf = binary[coding_config["Coding_param"]["inner1"]["n"]:-1] # Remove the padding bit
+            id = binary[:coding_config["ECC"]["inner1"]["n"]] # Extract index part
+            if coding_config["DNA2Binary"]["is_padding"]: # Extract information part, remove padding bit if exists
+                inf = binary[coding_config["ECC"]["inner1"]["n"]:-1] # Remove the padding bit
             else:
-                inf = binary[coding_config["Coding_param"]["inner1"]["n"]:]
-            temp_dnas.append([id, inf, num]) # Store the id, information part and counts
-        out_data_pools.append(temp_dnas)
+                inf = binary[coding_config["ECC"]["inner1"]["n"]:]
+            temp.append([id, inf, num]) # Store the id, information part and counts
+        out_data_pools.append(temp)
     return out_data_pools
 # Save padding info of binary to DNA conversion
 def save_padding_info_bin2DNA(file_name, is_padding, padding):

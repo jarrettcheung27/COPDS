@@ -63,7 +63,6 @@ arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, v
 
 # inspect index
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
-
 st.header('Upload file')
 # 使用file_uploader 上传多张图片
 uploaded_files = st.file_uploader(
@@ -233,59 +232,16 @@ file_ids = list(coding_config['files'].keys())
 for i, pool in enumerate(DNA_Library):
     dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_out.dna")
     temp = []
+    DNA_pool_json = {}
     for idx, out_dnas in enumerate(pool):
         # Extract simulated DNA sequences
         dnas = extract_dnas(out_dnas)
-        # Open the file in write mode
-        if idx == 0:
-            with open(dna_pool_filename, "w") as file:
-                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
-        else:   
-            # Append DNA sequences to the existing file
-            with open(dna_pool_filename, "a") as file:
-                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+        DNA_pool_json[f"chunk_{idx}"] = dnas
+    with open(dna_pool_filename, "w") as file:
+        json.dump(DNA_pool_json, file, ensure_ascii=False, indent=2)
     temp.append(dnas)
     DNA_Library[i] = temp
 print('Simulated DNAs saved to ', dna_lib_dir)
-
-
-# ===================== Read the simulated DNA ===================== #
-'''
-st.header('Decoding')
-st.subheader('Load Data')
-# Folder selection for DNA pools
-
-uploaded_dna_files = st.file_uploader(
-    "Select one or more simulated DNA pool to decode", 
-    type=["dna"], 
-    accept_multiple_files=True
-)
-# Obtain the original image file name from the selected .dna file
-file_name = ''
-if uploaded_dna_files:
-    # Use the first uploaded file as reference
-    dna_file_name = uploaded_dna_files[0].name
-    # Remove 'simu_' prefix if present and split at the last underscore
-    base_name = dna_file_name
-    if base_name.startswith('simu_'):
-        base_name = base_name[5:]
-    file_name = base_name.rsplit('_', 1)[0]
-out_file_name = file_name + '_reconstructed.jpg'    
-
-if uploaded_dna_files:
-    out_dnas_pools = []
-    strands_num = 0;
-    for uploaded_file in uploaded_dna_files:
-        dnas = uploaded_file.read().decode("utf-8").splitlines()
-        out_dnas = [dna.strip() for dna in dnas]
-        strands_num += len(out_dnas)
-        out_dnas_pools.append(out_dnas)
-    st.success(f"Loaded {strands_num} strands of length {len(out_dnas[0])} nts")
-else:
-    st.stop()
-    st.warning("No DNA files selected.")
-'''
 
 # ===================== Load the configuration file ===================== #
 config_path = "./config/config.json"
@@ -311,10 +267,30 @@ else:
 out_file_ids = [file_ids[i] for i, name in enumerate(file_names) if name in out_file_names]
 print(f'Selected files: {out_file_names}, IDs: {out_file_ids}')
 
+# -------------- Load the DNA pools from the selected files --------------
+DNA_Library = []
+strands_num = 0;
+for file_id in out_file_ids:
+    print(f'Loading DNA pool for file ID: {file_id}')
+    out_dna_pool = []
+    DNA_pool = json.load(open(os.path.join(dna_lib_dir, f"{file_id}_out.dna"), "r"))
+    block_num = coding_config['files'][file_id]['segmentation']['block_num']
+    for i in range(block_num):
+        out_dna_pool.append(DNA_pool[f'chunk_{i}'])
+        strands_num += len(DNA_pool[f'chunk_{i}'])
+    DNA_Library.append(out_dna_pool)
+st.success(f"Loaded {strands_num} strands of length {len(out_dna_pool[0])} nts")
 
 #================= DNA to Binary ====================#
 st.subheader('DNA to Binary')
-out_data_pools = DNA_pools_to_binary(coding_config,in_file_name,out_dna_pools)
+temp = []
+for pool in DNA_Library: # 提取出已选择的文件对应的DNA池，并转换为二进制数据
+    out_data_pools = DNA_pools_to_binary(coding_config,pool)
+    temp.append(out_data_pools)
+Library = temp  
+print('DNA to binary conversion completed.')
+print('Number of pools:', len(Library))
+print('Number of blocks in each pool:', [len(pool) for pool in Library])
 
 # ============================== BCH Decoding ============================= #
 

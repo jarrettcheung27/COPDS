@@ -1,7 +1,7 @@
 {
     "file_num": 3,
     "files": {
-        "1803ecb6-7643-4706-881f-5ea4871fb49f": {
+        "b3f4238e-7c93-4cfc-b922-a0d73eb23bdb": {
             "file_name": "Jnu.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -12,7 +12,7 @@
                 "pad_size": 12
             }
         },
-        "39c7894f-ae60-4d84-b68b-57f79b3a881c": {
+        "844751f0-e8a6-4548-9588-9fd3197c1a1b": {
             "file_name": "Jnu_test.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -23,7 +23,7 @@
                 "pad_size": 6
             }
         },
-        "0a30b843-78d6-4864-9eaa-d0808fc46b03": {
+        "bdaee864-5faf-43bc-9dbf-b76c606c112b": {
             "file_name": "webapp.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -54,19 +54,5 @@
     "DNA2Binary": {
         "is_padding": true,
         "padding": 0
-    },
-    "Coding_param": {
-        "outer": {
-            "n": 1334,
-            "k": 1000
-        },
-        "inner1": {
-            "n": 26,
-            "k": 11
-        },
-        "inner2": {
-            "n": 419,
-            "k": 320
-        }
     }
 }
