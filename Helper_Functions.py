@@ -9,7 +9,7 @@ import subprocess
 import json
 import streamlit as st
 import matplotlib.pyplot as plt
-from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution, save_simu_result
+from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution
 import matplotlib.pyplot as plt
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
@@ -407,18 +407,6 @@ def dna_to_bin_array(dna):
 def int_to_binary_array(number, length):
     # Step 1 & 2: Convert the integer to a binary string and remove the '0b' prefix
     binary_str = bin(number)[2:]
-
-    # Step 3: Pad the binary string with zeros at the beginning to ensure the desired length
-    padded_binary_str = binary_str.zfill(length)
-
-    # Step 4: Convert the binary string to a list of integers
-    binary_array = [int(bit) for bit in padded_binary_str]
-
-    return np.array(binary_array)
-    
-def int_to_binary_array(number, length):
-    # Step 1 & 2: Convert the integer to a binary string and remove the '0b' prefix
-    binary_str = bin(number)[2:]
     
     # Step 3: Pad the binary string with zeros at the beginning to ensure the desired length
     padded_binary_str = binary_str.zfill(length)
@@ -602,6 +590,7 @@ def effective_reduandancy(r_theory, k):
     eff_r[7] = [77, 84, 91, 98, 99]
     eff_r[9] = [9, 18, 27, 36, 45, 54, 63, 72, 81, 90, 99, 108, 117, 126, 135, 144]
     # r = r_theory
+    order = 1
     n = r_theory + k
     if (n >= 2**4 and n < 2**5):
         order = 5
@@ -647,11 +636,11 @@ class LDPC_Codec:
         mode = "encode"
         for block_id, block in enumerate(pool):
             # Prepare input file path
-            input_file = self.mid_data_folder + f"{file_id}_LDPC_Encode_in_{block_id}.txt"
+            input_file = self.mid_data_folder + f"{file_id}_LDPC_encode_in_{block_id}.txt"
             with open(input_file, "w") as f:
                 for chunk in block:
                     f.write(chunk + "\n")
-            output_file = self.mid_data_folder + f"{file_id}_LDPC_Encode_out_{block_id}.txt"
+            output_file = self.mid_data_folder + f"{file_id}_LDPC_encode_out_{block_id}.txt"
             # Call LDPC decoder executable
             mode = "encode"
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
@@ -706,6 +695,59 @@ def transpose_h2v(data_pools):
         transposed_data_pools.append(transposed_pool)
     return transposed_data_pools
 
+#--------------------- BCH -----------------------------#
+class BCH_Codec:
+    def __init__(self, coding_path = None):
+        self.coding_path = coding_path
+        with open(coding_path, "r") as f:
+            coding_config = json.load(f)
+        self.coding_config = coding_config
+        self.n1 = coding_config["ECC"]["inner1"]["n"]
+        self.k1 = coding_config["ECC"]["inner1"]["k"]
+        self.k2 = coding_config["ECC"]["inner2"]["k"]
+        self.n2 = coding_config["ECC"]["inner2"]["n"]
+        self.n0 = coding_config["ECC"]["outer"]["n"]
+        self.BCH_codec_path = coding_config["ECC"]["BCH_codec_exe"]
+        self.mid_data_folder = "./mid_data/"
+        # Call BCH decoder executable to encode ids
+        ids  = np.array([int_to_binary_array(id, self.k1) for id in range(self.n0)],dtype = np.uint8).T
+        input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
+        self.output_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_out.txt")
+        np.savetxt(input_file_ids, ids, fmt="%d", delimiter="")
+        
+        print(input_file_ids)
+        print(self.output_file_ids)
+        print(self.BCH_codec_path)
+        result = subprocess.run([self.BCH_codec_path, self.coding_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
+        print(result.stdout)  # Print the output from the BCH decoder
+        print(result.stderr)  # Print any error messages from the BCH decoder
+    def encode(self, file_id):
+        out_pool = []
+        block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
+        for block_id in range(block_num):
+            # Encode information bit by BCH encoder.
+            input_file = os.path.join(self.mid_data_folder, f"{file_id}_LDPC_encode_out_{block_id}.txt")
+            output_file = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_out_{block_id}.txt")
+            result = subprocess.run([self.BCH_codec_path, input_file, output_file, "encode"], capture_output=True, text=True)
+            print(result.stdout)  # Print the output from the BCH decoder
+            print(result.stderr)  # Print any error messages from the BCH decoder
+    
+            # Read each line and obtain the bits seperated by ','.
+            cwr_ids = []
+            for line in open(self.output_file_ids):
+                bits = line.strip().split(',')
+                cwr_ids.append(bits)
+            cwr_ids = np.array(cwr_ids,dtype=np.uint8)
+
+            cwr_data = []
+            for line in open(output_file):
+                bits = line.strip().split(',')
+                cwr_data.append(bits)
+            cwr_data = np.array(cwr_data, dtype=np.uint8)
+
+            out_pool.append(np.concatenate((cwr_ids, cwr_data), axis=1))
+        return out_pool
+    
 def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
     '''
     Save coding parameters to config file in JSON format.

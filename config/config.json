@@ -1,37 +1,15 @@
 {
-    "file_num": 3,
+    "file_num": 1,
     "files": {
-        "b3f4238e-7c93-4cfc-b922-a0d73eb23bdb": {
-            "file_name": "Jnu.jpg",
+        "f124bbf1-04c2-4bae-8c12-d1b8ffa6561e": {
+            "file_name": "Fruits.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
-            "file_size": 96708,
+            "file_size": 73968,
             "segmentation": {
-                "chunk_num": 2418,
-                "block_num": 3,
-                "pad_size": 12
-            }
-        },
-        "844751f0-e8a6-4548-9588-9fd3197c1a1b": {
-            "file_name": "Jnu_test.jpg",
-            "file_type": "image/jpeg",
-            "suffix": "jpg",
-            "file_size": 28194,
-            "segmentation": {
-                "chunk_num": 705,
-                "block_num": 1,
-                "pad_size": 6
-            }
-        },
-        "bdaee864-5faf-43bc-9dbf-b76c606c112b": {
-            "file_name": "webapp.jpg",
-            "file_type": "image/jpeg",
-            "suffix": "jpg",
-            "file_size": 668067,
-            "segmentation": {
-                "chunk_num": 16702,
-                "block_num": 17,
-                "pad_size": 13
+                "chunk_num": 1850,
+                "block_num": 2,
+                "pad_size": 32
             }
         }
     },
@@ -39,8 +17,8 @@
         "outer": {
             "n": 1334,
             "k": 1000,
-            "h_matrix_path": ".\\config\\Hmatrix.txt",
-            "ldpc_encoder_exe": ".\\Encode\\LDPC_PEG-v2.0.exe"
+            "h_matrix_path": "./config/Hmatrix.txt",
+            "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
         },
         "inner1": {
             "n": 26,
@@ -49,24 +27,8 @@
         "inner2": {
             "n": 419,
             "k": 320
-        }
-    },
-    "DNA2Binary": {
-        "is_padding": true,
-        "padding": 0
-    },
-    "Coding_param": {
-        "outer": {
-            "n": 1334,
-            "k": 1000
         },
-        "inner1": {
-            "n": 26,
-            "k": 11
-        },
-        "inner2": {
-            "n": 419,
-            "k": 320
-        }
-    }
+        "BCH_codec_exe": "./Encode/BCH_Codec.exe"
+    },
+    "DNA2Binary": {}
 }

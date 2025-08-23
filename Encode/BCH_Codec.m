@@ -31,8 +31,9 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
     % Each row corresponds to a binary vector extracted from the string
     msgs = cell2mat(cellfun(@(x) int8(x) - '0', msgs, 'UniformOutput', false));
     n_0 = length(msgs(1,:));
-    
+    disp(['BCH Encoding, mode: ',mode]);
     if mode == "encode" % Encode mode
+        disp(['Length of each row: ',num2str(length(msgs(:,1)))])
         % recognize layer
         if length(msgs(:,1)) == k1_bch
             k_bch = k1_bch;

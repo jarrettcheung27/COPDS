@@ -32,8 +32,6 @@ k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 1, max_value = 2
 r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 5, max_value = 50, value = 15)
 k_2 = chunk_size
 r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 5, max_value = 200, value =99)
-coding_config = {"Coding_param" : {"outer": {"n": n_0, "k": k_0}, "inner1": {"n": k_1 + r_1, "k": k_1}, "inner2": {"n": k_2 + r_2, "k": k_2}}}
-save_coding_config(config_path, outer_code = (n_0, k_0), inner1 = (k_1 + r_1, k_1), inner2 = (chunk_size + r_2, chunk_size)) # The same coding parameters are used for all images.
 
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
@@ -94,6 +92,7 @@ file_ids = [str(uuid.uuid4()) for _ in range(len(uploaded_files))]  # Generate u
 file_names = [file.name for file in uploaded_files]  # Get the names of the uploaded files
 name_to_id_mapping = {file_names[i]: file_ids[i] for i in range(len(uploaded_files))}
 
+# ---------------------seg configuration---------------------
 for i, file in enumerate(uploaded_files):
     coding_config['files'][file_ids[i]] = {
         "file_name": file.name,
@@ -107,8 +106,25 @@ for i, file in enumerate(uploaded_files):
         }
     }
 coding_config['file_num'] = len(uploaded_files)
-print(coding_config)
 
+# ---------------------coding configuration---------------------
+coding_config['ECC'] = {
+    "outer": {
+        "n": n_0,
+        "k": k_0,
+        "h_matrix_path": "./config/Hmatrix.txt",
+        "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
+    },
+    "inner1": {
+        "n": k_1 + r_1,
+        "k": k_1
+    },
+    "inner2": {
+        "n": chunk_size + r_2,
+        "k": chunk_size
+    },
+    "BCH_codec_exe": "./Encode/BCH_Codec.exe"
+}
 
 print('\n ==================== DNA 存储仿真平台 ==================== ')
 # ======================Select image to store ====================== #
@@ -133,7 +149,11 @@ for i, file in enumerate(uploaded_files):
 
     Library.append(pool)
 print('Images loaded and split into ', total_chunk, ' data chunks.')
-print('config:', coding_config)
+# ==================Save coding configuration================= #
+with open(config_path, "w") as f:
+    json.dump(coding_config, f, indent=4, ensure_ascii=False)
+print('Coding configuration saved to:', config_path)
+
 # Save input message for debugging
 '''
 for pool_idx, pool in enumerate(data_pools):
@@ -143,41 +163,22 @@ for pool_idx, pool in enumerate(data_pools):
             f.write(chunk + "\n")
 '''
 
-# -----------------------Indexing-----------------------
-ids  = np.array([int_to_binary_array(id, k_1) for id in range(n_0)])
-
 # =================================Encoding===================================#
 print('Processing Encode...')
-# ---------------------Save configuration---------------------
-coding_config['ECC'] = {
-    "outer": {
-        "n": n_0,
-        "k": k_0,
-        "h_matrix_path": ".\config\Hmatrix.txt",
-        "ldpc_encoder_exe": ".\Encode\LDPC_PEG-v2.0.exe"
-    },
-    "inner1": {
-        "n": k_1 + r_1,
-        "k": k_1
-    },
-    "inner2": {
-        "n": chunk_size + r_2,
-        "k": chunk_size
-    }
-}
 LDPC = LDPC_Codec(coding_config)
+BCH = BCH_Codec(config_path)  # Initialize BCH codec with config path
 temp = []
 for i, pool in enumerate(Library):
-    # LDPC encode
+
     # Transpose matrix for inter-oligos encoding
     pool = transpose_h2v(pool)
-    # 'Data is transposed for inter-oligos encoding, each pool is a list of strings, each string is the i-th bit of all chunks.'
 
-    # Path to the LDPC encoder executable and H matrix
-    pool = LDPC.encode(pool = pool,file_id = file_ids[i])
-    # Convert each pool to a 2-D numpy array and transpose for BCH encoding
-    # pool = transpose_v2h(pool)
-    # # save each block to file for ECH encode.
+    # Process LDPC encode for each pool, and save the encoded output
+    LDPC.encode(pool = pool,file_id = file_ids[i])
+
+    # Process BCH encode for each pool
+    print('BCH Encoding...')
+    BCH.encode(file_id = file_ids[i])
 print('Encoding completed.')
 
 
