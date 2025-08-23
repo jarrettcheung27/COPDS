@@ -4,8 +4,6 @@ import sys
 from math import sqrt
 from reedsolo import RSCodec
 import numpy as np
-from ordered_set import OrderedSet
-from scipy.spatial.distance import kulczynski1
 import os
 import subprocess
 import json
@@ -13,7 +11,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution, save_simu_result
 import matplotlib.pyplot as plt
-import matlab.engine
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
 
@@ -622,96 +619,44 @@ def effective_reduandancy(r_theory, k):
         r = effective_reduandancy(r, k) # Increase the order and refind.
     return r
 
-class BCH_Codec:
-    def __init__(self, coding_config = None):
-        self.n1 = coding_config["ECC"]["inner1"]["n"]
-        self.k1 = coding_config["ECC"]["inner1"]["k"]
-        self.k2 = coding_config["ECC"]["inner2"]["k"]
-        self.n2 = coding_config["ECC"]["inner2"]["n"]
-        self.n0 = coding_config["ECC"]["outer"]["n"]
 
-    def encode(self, ids, data_pools):
-        # print("BCH encoding...")
-        matlab_engine = matlab.engine.start_matlab()
-        matlab_engine.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
-        eng = matlab_engine
-        # Encode index by BCH encoder.
-        # st.text('BCH encoding...')
-        cwr_ids = eng.BCH_Encoder(self.n1, self.k1, self.n0, ids)
-        for pool_idx, pool in enumerate(data_pools):
-            # Encode information bit by BCH encoder.
-            cwr_data = eng.BCH_Encoder(self.n2, self.k2, self.n0, pool)
-            data_pools[pool_idx] = np.concatenate((cwr_ids, cwr_data), axis=1)
-        # print("BCH encode completed.")
-        return data_pools
-    def decode(self, out_data_pools):
-        # print('BCH Decoding...')
-        # Decode each pool
-        eng = matlab.engine.start_matlab()
-        eng.cd(r'D:\DeSP-main', nargout=0)  # Set MATLAB working directory
-        temp_pools = []
-        for pool in out_data_pools:
-            ids = np.array([segment[0] for segment in pool])
-            infs = np.array([segment[1] for segment in pool])
-            ids = eng.BCH_Decoder(self.n1, self.k1, len(ids), ids)
-            data = eng.BCH_Decoder(self.n2, self.k2, len(infs), infs)
-            temp = []
-            for i, id in enumerate(ids):
-                temp_id = ''.join(str(int(s)) for s in id[1:]) # Convert index bits to string, remove the first bit which is the flag
-                temp_data = ''.join(str(int(s)) for s in data[i][1:]) # Convert information bits to string, remove the first bit which is the flag
-                temp.append((temp_id, temp_data, pool[i][2])) # Store the id, information part and counts
-            temp_pools.append(temp)
-        out_data_pools  = temp_pools
-        # print('BCH decode completed.')
-        return out_data_pools
 #----------------------LDPC----------------------------#
 class LDPC_Codec:
-    def __init__(self, h_matrix_path='D:/COPDS-main/config/Hmatrix.txt',LDPC_codec_path = "D:/COPDS-main/Encode/LDPC_PEG-v2.0.exe", mid_data_folder = "D:/COPDS-main/Mid_data/"):
+    def __init__(self, coding_config, mid_data_folder = "./Mid_data/"):
         """
         Initialize the LDPC codec with the specified mode and H matrix path.
         :param mode: 'encode' or 'decode'
-        :param h_matrix_path: Path to the H matrix file for encoding/decoding
+        :param coding_config: Configuration for the coding process
+        :param mid_data_folder: Folder for intermediate data files
         """
-        self.h_matrix = h_matrix_path
-        self.LDPC_codec_path = LDPC_codec_path
+        self.h_matrix = coding_config["ECC"]["outer"]["h_matrix_path"]
+        self.LDPC_codec_path = coding_config["ECC"]["outer"]["ldpc_encoder_exe"]
         self.mid_data_folder = mid_data_folder # folder for mid data
         if not os.path.exists(self.mid_data_folder):
             os.makedirs(self.mid_data_folder)
-    def encode(self, data_pools):
+            print("Created directory:", self.mid_data_folder)
+
+    def encode(self, pool, file_id):
         """
         Encode data pools using LDPC encoder.
         Each pool is processed separately.
         Input: 
-        - data_pools: List of pools, each pool is a list of bit strings (chunks)
-        - ldpc_encoder_exe: Path to the LDPC encoder executable
-        - mode: Mode for the LDPC encoder ('encode' or 'decode')
-        - h_matrix_path: Path to the H matrix file for LDPC encoding
-        Output:
-        - encoded_data_pools: List of encoded pools, each pool is a list of encoded bit strings
+        - pool: List of pools, each pool is a list of bit strings (chunks)
+        - file_id: ID of the file being processed
         """
         mode = "encode"
-        encoded_data_pools = []
-        for pool_idx, pool in enumerate(data_pools):
+        for block_id, block in enumerate(pool):
             # Prepare input file path
-            input_file = self.mid_data_folder + f"ldpc_encode_input_{pool_idx}.txt"
+            input_file = self.mid_data_folder + f"{file_id}_LDPC_Encode_in_{block_id}.txt"
             with open(input_file, "w") as f:
-                for chunk in pool:
+                for chunk in block:
                     f.write(chunk + "\n")
-            
-            # Call LDPC encoder executable
-            output_file = self.mid_data_folder + f"ldpc_encode_output_{pool_idx}.txt"
+            output_file = self.mid_data_folder + f"{file_id}_LDPC_Encode_out_{block_id}.txt"
             # Call LDPC decoder executable
             mode = "encode"
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
             # print(result.stdout)  # Print the output from the LDPC decoder
             print(result.stderr)  # Print any error messages from the LDPC decoder
-            # Read encoded data back
-            encoded_pool = []
-            with open(output_file, "r") as f:
-                for line in f:
-                    encoded_pool.append(line.strip())
-            encoded_data_pools.append(encoded_pool)
-        return encoded_data_pools
 
     def decode(self, out_prob_pools,file_id):
         """
