@@ -1,4 +1,4 @@
-BCH_Encoder Executable
+BCH_Codec Executable
 
 1. Prerequisites for Deployment 
 
@@ -24,7 +24,7 @@ in the MathWorks Documentation Center.
 
 Files to Package for Standalone 
 ================================
--BCH_Encoder.exe
+-BCH_Codec.exe
 -MCRInstaller.exe 
     Note: if end users are unable to download the MATLAB Runtime using the
     instructions in the previous section, include it when building your 
