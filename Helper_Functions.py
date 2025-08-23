@@ -466,7 +466,6 @@ def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pool_filename):
     return dna_pools
 
 def DNA_pools_to_binary(coding_config, dna_pool):
-    print('DNA to binary...')
     out_data_pools = []
     # separate index and information part
     for chunk in dna_pool:
@@ -732,7 +731,6 @@ class LDPC_Codec:
             result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
             # print(result.stdout)  # Print the output from the LDPC decoder
             print(result.stderr)  # Print any error messages from the LDPC decoder
-        # print('Completed!')
 
 def transpose_v2h(data_pools):
     """
@@ -786,7 +784,7 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 # ----------------------voting----------------------------#
-def voting(pool, n_0, index_length, chunk_size):
+def voting(pool, coding_config):
     '''
     将相同index的序列聚类投票
     输入：
@@ -795,6 +793,9 @@ def voting(pool, n_0, index_length, chunk_size):
     n_0: number of chunks in the pool
     chunk_size: size of each chunk in bits
     '''
+    n_0 = coding_config["ECC"]["outer"]["n"]
+    chunk_size = coding_config["ECC"]["inner2"]["k"]
+    index_length = coding_config["ECC"]["inner1"]["k"]
     # prepare the segments for voting
     result = {} # Store the voting result in a dictionary
 

@@ -208,6 +208,43 @@ for i, pool in enumerate(Library):
     DNA_Library.append(temp)
 print('Binary to DNA conversion completed.')
 print('DNA pools saved to:', dna_lib_dir)
+
+# ==================Save coding configuration================= #
+with open(config_path, "w") as f:
+    json.dump(coding_config, f, indent=4, ensure_ascii=False)
+print('Coding configuration saved to:', config_path)
+
+# ============================= DNA simulation Channel ============================= #
+st.header('Error simulation of the DNA data storage channel')
+st.subheader('Load Data')
+Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
+
+for i, dna_pools in enumerate(DNA_Library):
+    # Run Simulation for each pool
+    temp = []
+    for dnas in dna_pools:
+        out_dnas = Channel(dnas)
+        temp.append(out_dnas)
+    DNA_Library[i] = temp
+print('Simulation completed.')
+
+
+# --------------Save Simulation results ----------------
+file_ids = list(coding_config['files'].keys())
+for i, pool in enumerate(DNA_Library):
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_out.dna")
+    temp = []
+    DNA_pool_json = {}
+    for idx, out_dnas in enumerate(pool):
+        # Extract simulated DNA sequences
+        dnas = extract_dnas(out_dnas)
+        DNA_pool_json[f"chunk_{idx}"] = dnas
+    with open(dna_pool_filename, "w") as file:
+        json.dump(DNA_pool_json, file, ensure_ascii=False, indent=2)
+    temp.append(dnas)
+    DNA_Library[i] = temp
+print('Simulated DNAs saved to ', dna_lib_dir)
+
 # ===================== Load the configuration file ===================== #
 config_path = "./config/config.json"
 with open(config_path, 'r', encoding='utf-8') as f:
@@ -265,50 +302,54 @@ for i, pool in enumerate(Library):
     # Cluster the sequences with the same index in each pool
     prob_pool = [] # Store the voting results for each pool
     for chunk in pool:
-        temp = voting(chunk, coding_config["Coding_param"]["outer"]["n"], coding_config["Coding_param"]["inner1"]["k"], coding_config["Coding_param"]["inner2"]["k"])
+        temp = voting(chunk, coding_config)
         prob_pool.append(temp) # Probability of each bit in the voting result, for LDPC decoding
     # ===================== LDPC Decoding ===================== #
     LDPC = LDPC_Codec()
     LDPC.decode(prob_pool,file_id=file_ids[i])
 print('LDPC decoding completed.')
-
 st.header('Image Reconstruction')
-# Read decoded output to reconstruct the image
-
+out_file_folder = './Recovered_files/'
+if not os.path.exists(out_file_folder):
+    os.makedirs(out_file_folder)
 # Read the config file to obtain the configuration.
-pool_num = coding_config[in_file_name]["segmentation"]["block_num"]
-chunk_num = coding_config[in_file_name]["segmentation"]["chunk_num"]
-pad_size = coding_config[in_file_name]["segmentation"]["pad_size"]
-decoded_chunks = []
-for pool_idx in range(pool_num):
-    ldpc_output_file = f"./Mid_data/ldpc_decode_output_{pool_idx}.txt"
-    with open(ldpc_output_file, "r") as f:
-        pool_bits = [line.strip() for line in f]
-        # Transpose: each line is a bit position, columns are chunks
-        pool_bits_T = list(zip(*pool_bits))
-        for chunk_bits_tuple in pool_bits_T:
-            chunk_bits = ''.join(chunk_bits_tuple)
-            chunk_bytes = bits2bytes(chunk_bits)
-            decoded_chunks.append(chunk_bytes)
+for file_id in out_file_ids:
+    block_num = coding_config['files'][file_id]["segmentation"]["block_num"]
+    chunk_num = coding_config['files'][file_id]["segmentation"]["chunk_num"]
+    pad_size = coding_config['files'][file_id]["segmentation"]["pad_size"]
+    block = []
+    for block_idx in range(block_num):
+        ldpc_output_file = f"./Mid_data/{file_id}_decode_out_{block_idx}.txt"
+        with open(ldpc_output_file, "r") as f:
+            block_bits = [line.strip() for line in f]
+            # Transpose: each line is a bit position, columns are chunks
+            block_bits_T = list(zip(*block_bits))
+            for chunk_bits_tuple in block_bits_T:
+                chunk_bits = ''.join(chunk_bits_tuple)
+                chunk_bytes = bits2bytes(chunk_bits)
+                block.append(chunk_bytes)
+    # Remove padding chunks if pad decoded_chunks number > original chunk number
+    block = block[:chunk_num]
+    # Remove padding bytes in the last chunk if pad_size > 0
+    if pad_size > 0:
+        last_chunk = block[-1]
+        if len(last_chunk) > pad_size:
+            block[-1] = last_chunk[:-pad_size]  # Remove padding bytes from the last chunk 
+    # Save reconstructed image
+    in_file_name = coding_config['files'][file_id]['file_name']
+    out_file_names = in_file_name.split('.')[0]+'_reconstructed.'+in_file_name.split('.')[-1]
+    out_file_path = os.path.join(out_file_folder, out_file_names)
+    with open(out_file_path, "wb") as f:
+        for chunk in block:
+            f.write(chunk)
+    st.success(f"Retrieved data saved in {out_file_folder}")
 
-# Remove padding chunks if pad decoded_chunks number > original chunk number
-decoded_chunks = decoded_chunks[:chunk_num]
-
-# Remove padding bytes in the last chunk if pad_size > 0
-if pad_size > 0:
-    last_chunk = decoded_chunks[-1]
-    if len(last_chunk) > pad_size:
-        decoded_chunks[-1] = last_chunk[:-pad_size]  # Remove padding bytes from the last chunk 
-
-# Save reconstructed image
-with open(out_file_path, "wb") as f:
-    for chunk in decoded_chunks:
-        f.write(chunk)
-
-st.success(f"Image reconstructed and saved as {out_file_path}")
-st.subheader('Quality Evaluation')
-st.image(out_file_path, width = 300)
-
+# Display reconstructed images horizontally
+cols = st.columns(len(out_file_ids))
+for idx, col in enumerate(cols):
+    with col:
+        st.image(out_file_path, caption=f"Reconstructed version of '{in_file_name}'", width=300)
+# st.subheader('Quality Evaluation')
 # ------------------------ optimizing ----------------------------- #
 '''
 st.header('Encoding Optimization')
