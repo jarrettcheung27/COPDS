@@ -130,3 +130,7 @@ DNA_Library/
 Mid_data/
 config/config.json
 Recovered_files/
+
+# MATLAB file
+*.asv
+*.mat
