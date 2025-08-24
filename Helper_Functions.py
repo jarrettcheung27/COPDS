@@ -697,9 +697,9 @@ def transpose_h2v(data_pools):
 
 #--------------------- BCH -----------------------------#
 class BCH_Codec:
-    def __init__(self, coding_path = None):
-        self.coding_path = coding_path
-        with open(coding_path, "r") as f:
+    def __init__(self, cofig_path = None):
+        self.cofig_path = cofig_path
+        with open(cofig_path, "r") as f:
             coding_config = json.load(f)
         self.coding_config = coding_config
         self.n1 = coding_config["ECC"]["inner1"]["n"]
@@ -709,7 +709,7 @@ class BCH_Codec:
         self.n0 = coding_config["ECC"]["outer"]["n"]
         self.BCH_codec_path = coding_config["ECC"]["BCH_codec_exe"]
         self.mid_data_folder = "./mid_data/"
-        # Call BCH decoder executable to encode ids
+        # Call BCH decoder executable to encode ids in the initialization
         ids  = np.array([int_to_binary_array(id, self.k1) for id in range(self.n0)],dtype = np.uint8).T
         input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
         self.output_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_out.txt")
@@ -718,9 +718,10 @@ class BCH_Codec:
         print(input_file_ids)
         print(self.output_file_ids)
         print(self.BCH_codec_path)
-        result = subprocess.run([self.BCH_codec_path, self.coding_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
+        result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
         print(result.stdout)  # Print the output from the BCH decoder
         print(result.stderr)  # Print any error messages from the BCH decoder
+
     def encode(self, file_id):
         out_pool = []
         block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
@@ -728,7 +729,7 @@ class BCH_Codec:
             # Encode information bit by BCH encoder.
             input_file = os.path.join(self.mid_data_folder, f"{file_id}_LDPC_encode_out_{block_id}.txt")
             output_file = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_out_{block_id}.txt")
-            result = subprocess.run([self.BCH_codec_path, input_file, output_file, "encode"], capture_output=True, text=True)
+            result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file, output_file, "encode"], capture_output=True, text=True)
             print(result.stdout)  # Print the output from the BCH decoder
             print(result.stderr)  # Print any error messages from the BCH decoder
     
