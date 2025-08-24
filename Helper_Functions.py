@@ -719,35 +719,40 @@ class BCH_Codec:
         print(self.output_file_ids)
         print(self.BCH_codec_path)
         result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
-        print(result.stdout)  # Print the output from the BCH decoder
+        # print(result.stdout)  # Print the output from the BCH decoder
         print(result.stderr)  # Print any error messages from the BCH decoder
 
     def encode(self, file_id):
-        out_pool = []
+        '''
+        Encode the file with the given file_id using BCH encoding.
+        Output:
+            The concatenation of id codeword and data codeword alone row.
+        '''
+        out_block = []
         block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
         for block_id in range(block_num):
             # Encode information bit by BCH encoder.
             input_file = os.path.join(self.mid_data_folder, f"{file_id}_LDPC_encode_out_{block_id}.txt")
             output_file = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_out_{block_id}.txt")
             result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file, output_file, "encode"], capture_output=True, text=True)
-            print(result.stdout)  # Print the output from the BCH decoder
+            # print(result.stdout)  # Print the output from the BCH decoder
             print(result.stderr)  # Print any error messages from the BCH decoder
     
-            # Read each line and obtain the bits seperated by ','.
-            cwr_ids = []
+            # Read each line and obtain the bits seperated by ','. each row is of length n_0.
+            id_block = []
             for line in open(self.output_file_ids):
                 bits = line.strip().split(',')
-                cwr_ids.append(bits)
-            cwr_ids = np.array(cwr_ids,dtype=np.uint8)
+                id_block.append(bits)
+            id_block = np.array(id_block,dtype=np.uint8).T
 
-            cwr_data = []
+            data_block = []
             for line in open(output_file):
                 bits = line.strip().split(',')
-                cwr_data.append(bits)
-            cwr_data = np.array(cwr_data, dtype=np.uint8)
+                data_block.append(bits)
+            data_block = np.array(data_block, dtype=np.uint8).T
 
-            out_pool.append(np.concatenate((cwr_ids, cwr_data), axis=1))
-        return out_pool
+            out_block.append(np.concatenate((id_block, data_block), axis=1))
+        return out_block
     
 def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
     '''

@@ -11,9 +11,6 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
 %            output: text file, n_bch rows bit of length n0, bits are
 %            seperated by comma in each line.
 
-    % if args.length < 4
-    %    error('Not enough input arguments. Usage: BCH_Codec(config_path, infile_path, outfile_path, mode)');
-    % end
     % Load configuration from config.json
     coding_config = jsondecode(fileread(config_path));
 
