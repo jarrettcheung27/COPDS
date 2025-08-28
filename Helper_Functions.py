@@ -11,6 +11,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution
 import matplotlib.pyplot as plt
+import pdb # python debugger
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
 

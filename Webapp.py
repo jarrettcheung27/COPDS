@@ -17,11 +17,16 @@ import pdb # python debugger
 # ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
-config_path = "./config/config.json"
-dna_lib_dir = "./DNA_Library/"
 
+CONFIG_PATH = "./config/config.json"
+DNA_LIB_DIR = "./DNA_Library/"
+DEBUG_MODE = True
+
+if DEBUG_MODE:
+    coding_config = json.load(open(CONFIG_PATH, "r"))
+    file_ids = list(coding_config['files'].keys())
 # =========================== assigning parameters ========================= #
-
+print('Running Webapp...')
 # ------------ Choosing parameters -------------- # 
 st.sidebar.subheader('Coding Parameter')
 chunk_size = st.sidebar.number_input('DNA chunk size', min_value = 100, max_value = 400, value = 320)
@@ -62,127 +67,9 @@ arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, v
 # inspect index
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
 
-st.header('Upload file')
-# 使用file_uploader 上传多张图片
-uploaded_files = st.file_uploader(
-    "Select images to store in DNA",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True,
-    key="file_uploader"
-)
-if uploaded_files is not None:
-    for uploaded_file in uploaded_files:
-        # 使用 PIL 打开图片
-        image = Image.open(uploaded_file)
-        st.image(image, caption="上传的图片", width=100)
-
-# If no files are uploaded, use a default image
-if not st.session_state.get("file_uploader"):
-    # Use a default image if no files are uploaded
-    default_image_path = "D:/COPDS-main/DNA_Library/Jnu_test.jpg"
-    st.session_state["file_uploader"] = [default_image_path]
-
-# Initialize coding configuration
-coding_config = {'file_num':0,
-                 'files': {},
-                 'ECC': {},
-                 'DNA2Binary': {}
-                 }
-file_ids = [str(uuid.uuid4()) for _ in range(len(uploaded_files))]  # Generate unique IDs for each image
-file_names = [file.name for file in uploaded_files]  # Get the names of the uploaded files
-name_to_id_mapping = {file_names[i]: file_ids[i] for i in range(len(uploaded_files))}
-
-# ---------------------seg configuration---------------------
-for i, file in enumerate(uploaded_files):
-    coding_config['files'][file_ids[i]] = {
-        "file_name": file.name,
-        "file_type": file.type,
-        "suffix": file.name.split('.')[-1],
-        "file_size": file.size,
-        "segmentation": {
-            "chunk_num": 0,
-            "block_num": 0,
-            "pad_size": 0
-        }
-    }
-uploaded_file_num = len(uploaded_files)
-coding_config['file_num'] = uploaded_file_num
-
-# ---------------------coding configuration---------------------
-coding_config['ECC'] = {
-    "outer": {
-        "n": n_0,
-        "k": k_0,
-        "h_matrix_path": "./config/Hmatrix.txt",
-        "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
-    },
-    "inner1": {
-        "n": k_1 + r_1,
-        "k": k_1
-    },
-    "inner2": {
-        "n": chunk_size + r_2,
-        "k": chunk_size
-    },
-    "BCH_codec_exe": "./Encode/BCH_Codec.exe"
-}
-
-print('\n ==================== DNA 存储仿真平台 ==================== ')
-# ======================Select image to store ====================== #
-# Create the DNA_Library directory if it doesn't exist
-os.makedirs(dna_lib_dir, exist_ok=True)
-
-# =====================Segmentation==================== #
-# 数据分层结构 Library->pool(image)->block(coding unit)->chunk(dna)
-st.subheader('Segmentation')
-total_chunk = 0
-Library = []
-for i, file in enumerate(uploaded_files):
-    block, pad_size = split_image(file, chunk_size)
-    total_chunk += len(block)
-    # bytes to bits
-    block = [bytes2bits(chunk) for chunk in block]
-    coding_config['files'][file_ids[i]]['segmentation']['chunk_num'] = len(block)
-    # Split data into pools of size k_0 (1000), pad the last pool if needed
-    pool = split_data(block, block_size=k_0, chunk_size=chunk_size)
-    coding_config['files'][file_ids[i]]['segmentation']['block_num'] = len(pool)
-    coding_config['files'][file_ids[i]]['segmentation']['pad_size'] = pad_size
-
-    Library.append(pool)
-print('Images loaded and split into ', total_chunk, ' data chunks.')
-# ==================Save coding configuration================= #
-with open(config_path, "w") as f:
-    json.dump(coding_config, f, indent=4, ensure_ascii=False)
-print('Coding configuration saved to:', config_path)
-
-# Save input message for debugging
-'''
-for pool_idx, pool in enumerate(data_pools):
-    message_input_file = f"D:\DeSP-main\App_Simulation_Platform\Mid_data\ldpc_encode_input_{pool_idx}.txt"
-    with open(message_input_file, "w") as f:
-        for chunk in pool:
-            f.write(chunk + "\n")
-'''
-
-# =================================Encoding===================================#
-print('Processing Encode...')
 LDPC = LDPC_Codec(coding_config)
-BCH = BCH_Codec(config_path)  # Initialize BCH codec with config path
-temp = []
-for i, pool in enumerate(Library):
+BCH = BCH_Codec(CONFIG_PATH)  # Initialize BCH codec with config path
 
-    # Transpose matrix for inter-oligos encoding
-    pool = transpose_h2v(pool)
-
-    # Process LDPC encode for each pool, and save the encoded output
-    LDPC.encode(pool = pool,file_id = file_ids[i])
-
-    # Process BCH encode for each pool
-    print('BCH Encoding...')
-    BCH.encode(file_id = file_ids[i])
-print('Encoding completed.')
-
- 
 #===============================Binary to DNA===============================#
 st.subheader('Binary to DNA')
 print('Binary to DNA...')
@@ -198,22 +85,21 @@ coding_config['DNA2Binary'] = {
 }
 DNA_Library = []
 # Read BCH codeword form the txt file and convert to DNA
-for i in range(uploaded_file_num):
+for i in range(coding_config['file_num']):
+    pool = []
     for block_id in range(coding_config['files'][file_ids[i]]['segmentation']['block_num']):
         input_codeword_name = f"{file_ids[i]}_BCH_encode_out_{block_id}.txt"
-        input_codeword_path = os.path.join(LDPC.mid_data_folder, input_codeword_name)
-        pool = []
+        input_codeword_path = os.path.join(LDPC.mid_data_folder, input_codeword_name)        
+        block = []
         with open(input_codeword_path, "r") as f:  # bit is separated by ','
             bch_codeword = f.read().strip()
             lines = bch_codeword.split('\n')
-            block = []
             for line in lines:
                 block.append([int(x) if x in ['0', '1'] else ValueError("Invalid character in line") for x in line.split(',')])
-            pool.append(np.array(block))
-            pdb.set_trace()
-    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_in.dna")
+        pool.append(np.array(block).T)
+    dna_pool_filename = os.path.join(DNA_LIB_DIR, f"{file_ids[i]}_in.dna")
     temp = binary_to_dna_pools(pool, dna_length, is_padding, dna_pool_filename)
     DNA_Library.append(temp)
 print('Binary to DNA conversion completed.')
-print('DNA pools saved to:', dna_lib_dir)
+print('DNA pools saved to:', DNA_LIB_DIR)
 
