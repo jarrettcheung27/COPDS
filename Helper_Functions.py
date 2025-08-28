@@ -714,10 +714,6 @@ class BCH_Codec:
         input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
         self.output_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_out.txt")
         np.savetxt(input_file_ids, ids, fmt="%d", delimiter="")
-        
-        print(input_file_ids)
-        print(self.output_file_ids)
-        print(self.BCH_codec_path)
         result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
         # print(result.stdout)  # Print the output from the BCH decoder
         print(result.stderr)  # Print any error messages from the BCH decoder

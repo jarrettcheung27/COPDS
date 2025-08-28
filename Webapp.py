@@ -13,7 +13,7 @@ import numpy as np
 import json
 from PIL import Image
 import uuid
-
+import pdb # python debugger
 # ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
@@ -105,7 +105,8 @@ for i, file in enumerate(uploaded_files):
             "pad_size": 0
         }
     }
-coding_config['file_num'] = len(uploaded_files)
+uploaded_file_num = len(uploaded_files)
+coding_config['file_num'] = uploaded_file_num
 
 # ---------------------coding configuration---------------------
 coding_config['ECC'] = {
@@ -181,4 +182,38 @@ for i, pool in enumerate(Library):
     BCH.encode(file_id = file_ids[i])
 print('Encoding completed.')
 
+ 
+#===============================Binary to DNA===============================#
+st.subheader('Binary to DNA')
+print('Binary to DNA...')
+total_bits = chunk_size + k_1 + r_1 + r_2
+dna_length = int(np.ceil(total_bits / 2))  # Each DNA nucleotide encodes 2 bits
+if (total_bits % 2) != 0:
+    is_padding = True
+else:
+    is_padding = False
+coding_config['DNA2Binary'] = {
+    "is_padding": is_padding,
+    "padding": 0,
+}
+DNA_Library = []
+# Read BCH codeword form the txt file and convert to DNA
+for i in range(uploaded_file_num):
+    for block_id in range(coding_config['files'][file_ids[i]]['segmentation']['block_num']):
+        input_codeword_name = f"{file_ids[i]}_BCH_encode_out_{block_id}.txt"
+        input_codeword_path = os.path.join(LDPC.mid_data_folder, input_codeword_name)
+        pool = []
+        with open(input_codeword_path, "r") as f:  # bit is separated by ','
+            bch_codeword = f.read().strip()
+            lines = bch_codeword.split('\n')
+            block = []
+            for line in lines:
+                block.append([int(x) if x in ['0', '1'] else ValueError("Invalid character in line") for x in line.split(',')])
+            pool.append(np.array(block))
+            pdb.set_trace()
+    dna_pool_filename = os.path.join(dna_lib_dir, f"{file_ids[i]}_in.dna")
+    temp = binary_to_dna_pools(pool, dna_length, is_padding, dna_pool_filename)
+    DNA_Library.append(temp)
+print('Binary to DNA conversion completed.')
+print('DNA pools saved to:', dna_lib_dir)
 
