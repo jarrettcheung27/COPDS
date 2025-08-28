@@ -724,7 +724,9 @@ class BCH_Codec:
 
     def encode(self, file_id):
         '''
-        Encode the file with the given file_id using BCH encoding.
+        Encode each block with the given file_id using BCH encoding.
+        Input:
+            file_id: The ID of the file to encode.
         Output:
             The concatenation of id codeword and data codeword alone row.
         '''
@@ -753,6 +755,7 @@ class BCH_Codec:
 
             out_block.append(np.concatenate((id_block, data_block), axis=1))
         return out_block
+
     
 def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
     '''
