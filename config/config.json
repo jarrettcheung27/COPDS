@@ -30,5 +30,8 @@
         },
         "BCH_codec_exe": "./Encode/BCH_Codec.exe"
     },
-    "DNA2Binary": {}
+    "DNA2Binary": {
+        "is_padding": true,
+        "padding": 0
+    }
 }

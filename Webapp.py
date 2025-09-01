@@ -103,3 +103,41 @@ for i in range(coding_config['file_num']):
 print('Binary to DNA conversion completed.')
 print('DNA pools saved to:', DNA_LIB_DIR)
 
+# ==================Save coding configuration================= #
+with open(CONFIG_PATH, "w") as f:
+    json.dump(coding_config, f, indent=4, ensure_ascii=False)
+print('Coding configuration saved to:', CONFIG_PATH)
+# ============================= DNA simulation Channel ============================= #
+st.header('Error simulation of the DNA data storage channel')
+st.subheader('Load Data')
+Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
+
+for i, dna_pools in enumerate(DNA_Library):
+    # Run Simulation for each pool
+    temp = []
+    for dnas in dna_pools:
+        out_dnas = Channel(dnas)
+        temp.append(out_dnas)
+    DNA_Library[i] = temp
+print('Simulation completed.')
+
+
+# --------------Save Simulation results ----------------
+for i, pool in enumerate(DNA_Library):
+    dna_pool_filename = os.path.join(DNA_LIB_DIR, f"{file_ids[i]}_out.dna")
+    temp = []
+    for idx, out_dnas in enumerate(pool):
+        # Extract simulated DNA sequences
+        dnas = extract_dnas(out_dnas)
+        # Open the file in write mode
+        if idx == 0:
+            with open(dna_pool_filename, "w") as file:
+                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+        else:   
+            # Append DNA sequences to the existing file
+            with open(dna_pool_filename, "a") as file:
+                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+    temp.append(dnas)
+    DNA_Library[i] = temp
+print('Simulated DNAs saved to ', DNA_LIB_DIR)
