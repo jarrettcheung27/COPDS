@@ -68,7 +68,8 @@ arg.seq_depth = st.sidebar.slider('Seq Depth', min_value = 1, max_value = 100, v
 index = st.sidebar.slider('inspect index', max_value = 600, value = 0)
 
 LDPC = LDPC_Codec(coding_config)
-BCH = BCH_Codec(CONFIG_PATH)  # Initialize BCH codec with config path
+BCH = BCH_Codec(coding_config)  # Initialize BCH codec with config path
+
 
 #===============================Binary to DNA===============================#
 st.subheader('Binary to DNA')
@@ -126,18 +127,82 @@ print('Simulation completed.')
 for i, pool in enumerate(DNA_Library):
     dna_pool_filename = os.path.join(DNA_LIB_DIR, f"{file_ids[i]}_out.dna")
     temp = []
+    out_pool = {}
     for idx, out_dnas in enumerate(pool):
         # Extract simulated DNA sequences
-        dnas = extract_dnas(out_dnas)
+        out_pool[f"chunk_{idx}"] = extract_dnas(out_dnas)
         # Open the file in write mode
-        if idx == 0:
-            with open(dna_pool_filename, "w") as file:
-                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
-        else:   
-            # Append DNA sequences to the existing file
-            with open(dna_pool_filename, "a") as file:
-                json.dump({f"chunk_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+
+    with open(dna_pool_filename, "w") as file:
+        # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
+        json.dump(out_pool, file, ensure_ascii=False, indent=2)
     temp.append(dnas)
     DNA_Library[i] = temp
 print('Simulated DNAs saved to ', DNA_LIB_DIR)
+
+# ===================== Load the configuration file ===================== #
+config_path = "./config/config.json"
+with open(config_path, 'r', encoding='utf-8') as f:
+    coding_config = json.load(f)
+file_ids = list(coding_config['files'].keys())
+# ===================== Select file to decode and restore===================== #
+st.header('Select file to decode')
+store_file_num = coding_config['file_num']
+
+if store_file_num == 0:
+    st.warning("No files are stored in the DNA Library. Please upload files first.")
+    st.stop()
+else:
+    file_names = [coding_config['files'][id]['file_name'] for id in file_ids]
+    file_ids = list(coding_config['files'].keys())
+    out_file_names = st.multiselect(
+        "Select files to restore",
+        options=file_names,
+        default=file_names[0]  # Default to the first file
+    )
+# -------------- obtain the IDs of the selected files --------------
+out_file_ids = [file_ids[i] for i, name in enumerate(file_names) if name in out_file_names]
+print(f'Selected files: {out_file_names}, IDs: {out_file_ids}')
+
+# -------------- Load the DNA pools from the selected files --------------
+DNA_Library = []
+strands_num = 0;
+for file_id in out_file_ids:
+    print(f'Loading DNA pool for file ID: {file_id}')
+    out_dna_pool = []
+    DNA_pool = json.load(open(os.path.join(DNA_LIB_DIR, f"{file_id}_out.dna"), "r"))
+    block_num = coding_config['files'][file_id]['segmentation']['block_num']
+    for i in range(block_num):
+        out_dna_pool.append(DNA_pool[f'chunk_{i}'])
+        strands_num += len(DNA_pool[f'chunk_{i}'])
+    DNA_Library.append(out_dna_pool)
+st.success(f"Loaded {strands_num} strands of length {chunk_size} nts")
+
+#================= DNA to Binary ====================#
+st.subheader('DNA to Binary')
+temp = []
+for pool in DNA_Library: # 提取出已选择的文件对应的DNA池，并转换为二进制数据
+    out_data_pool = DNA_pool_to_binary_pool(coding_config,pool)
+    temp.append(out_data_pool)
+Library = temp
+print('DNA to binary conversion completed.')
+print('Number of pools:', len(Library))
+print('Number of blocks in each pool:', [len(pool) for pool in Library])
+
+
+print('Voting and decoding...')
+BCH = BCH_Codec(coding_config = coding_config)
+for i, pool in enumerate(Library):
+    # ============================== BCH Decoding ============================= #
+    BCH.pool_to_txt(pool = pool, file_id = file_ids[i])
+    pool = BCH.decode(file_ids[i])
+    
+    # Cluster the sequences with the same index in each pool
+    prob_pool = [] # Store the voting results for each pool
+    for chunk in pool:
+        temp = voting(chunk, coding_config)
+        prob_pool.append(temp) # Probability of each bit in the voting result, for LDPC decoding
+    # ===================== LDPC Decoding ===================== #
+    LDPC = LDPC_Codec(coding_config = coding_config)
+    LDPC.decode(prob_pool,file_id=file_ids[i])
+print('LDPC decoding completed.')

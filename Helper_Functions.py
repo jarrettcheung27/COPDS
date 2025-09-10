@@ -10,7 +10,6 @@ import json
 import streamlit as st
 import matplotlib.pyplot as plt
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution
-import matplotlib.pyplot as plt
 import pdb # python debugger
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
@@ -451,22 +450,37 @@ def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pool_filename):
                 json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
     return dna_pools
 
-def DNA_pools_to_binary(coding_config, dna_pool):
-    out_data_pools = []
+def DNA_pool_to_binary_pool(coding_config, dna_pool):
+    '''
+    Convert the extracted DNAs to binary with the format of 
+    [columns of id]  [columns of information part] [columns of reads number]
+    Input:
+        coding_config: The coding configuration dictionary.
+        dna_pool: The DNA pool to convert.
+    Output:
+        A binary data pools, each containing few blocks, 
+        and each block contain three columns of binary data [id] [information part] [reads].
+        It's a list of three arrays.
+    '''
+    out_binary_pool = [] # 
     # separate index and information part
-    for chunk in dna_pool:
-        temp = [] # Temporary dictionary to store DNA {id, information part, counts}.
-        for dna, num in chunk.items():
+    for block in dna_pool:
+        ids = [] # Temporary dictionary to store three column of binary data [id] [information part] [reads].
+        information_parts = []
+        counts = []
+        for dna, num in block.items():
             dna = dna.strip()
             binary = dna_to_bin_array(dna) # Convert DNA to binary array
-            id = binary[:coding_config["ECC"]["inner1"]["n"]] # Extract index part
+            ids.append(binary[:coding_config["ECC"]["inner1"]["n"]]) # Extract index part
             if coding_config["DNA2Binary"]["is_padding"]: # Extract information part, remove padding bit if exists
                 inf = binary[coding_config["ECC"]["inner1"]["n"]:-1] # Remove the padding bit
             else:
                 inf = binary[coding_config["ECC"]["inner1"]["n"]:]
-            temp.append([id, inf, num]) # Store the id, information part and counts
-        out_data_pools.append(temp)
-    return out_data_pools
+            information_parts.append(inf)
+            counts.append(num)
+        out_binary_pool.append([np.array(ids,dtype=np.uint8), np.array(information_parts,dtype=np.uint8), np.array(counts,dtype=np.uint8)]) # Store the id, information part and counts
+    return out_binary_pool
+
 # Save padding info of binary to DNA conversion
 def save_padding_info_bin2DNA(file_name, is_padding, padding):
     '''
@@ -698,10 +712,7 @@ def transpose_h2v(data_pools):
 
 #--------------------- BCH -----------------------------#
 class BCH_Codec:
-    def __init__(self, cofig_path = None):
-        self.cofig_path = cofig_path
-        with open(cofig_path, "r") as f:
-            coding_config = json.load(f)
+    def __init__(self,coding_config):
         self.coding_config = coding_config
         self.n1 = coding_config["ECC"]["inner1"]["n"]
         self.k1 = coding_config["ECC"]["inner1"]["k"]
@@ -710,12 +721,13 @@ class BCH_Codec:
         self.n0 = coding_config["ECC"]["outer"]["n"]
         self.BCH_codec_path = coding_config["ECC"]["BCH_codec_exe"]
         self.mid_data_folder = "./mid_data/"
+        self.config_path = "./config/config.json"
         # Call BCH decoder executable to encode ids in the initialization
         ids  = np.array([int_to_binary_array(id, self.k1) for id in range(self.n0)],dtype = np.uint8).T
         input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
         self.output_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_out.txt")
         np.savetxt(input_file_ids, ids, fmt="%d", delimiter="")
-        result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
+        result = subprocess.run([self.BCH_codec_path, self.config_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
         # print(result.stdout)  # Print the output from the BCH decoder
         print(result.stderr)  # Print any error messages from the BCH decoder
 
@@ -727,13 +739,13 @@ class BCH_Codec:
         Output:
             The concatenation of id codeword and data codeword alone row.
         '''
-        out_block = []
+        out_pool = []
         block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
         for block_id in range(block_num):
             # Encode information bit by BCH encoder.
             input_file = os.path.join(self.mid_data_folder, f"{file_id}_LDPC_encode_out_{block_id}.txt")
             output_file = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_out_{block_id}.txt")
-            result = subprocess.run([self.BCH_codec_path, self.cofig_path, input_file, output_file, "encode"], capture_output=True, text=True)
+            result = subprocess.run([self.BCH_codec_path, self.config_path, input_file, output_file, "encode"], capture_output=True, text=True)
             # print(result.stdout)  # Print the output from the BCH decoder
             print(result.stderr)  # Print any error messages from the BCH decoder
     
@@ -750,10 +762,67 @@ class BCH_Codec:
                 data_block.append(bits)
             data_block = np.array(data_block, dtype=np.uint8).T
 
-            out_block.append(np.concatenate((id_block, data_block), axis=1))
-        return out_block
-
+            out_pool.append(np.concatenate((id_block, data_block), axis=1))
+        return out_pool
     
+    def decode(self, file_id):
+        '''
+        Decode each block with the given file_id using BCH decoding.
+        Input:
+            file_id: The ID of the file to decode.
+        Output:
+            The concatenation of id codeword and data codeword alone row.
+        '''
+        out_pool = []
+        block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
+        for block_id in range(block_num):
+            # Decode id and information bit by BCH encoder.
+            input_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_id_in_{block_id}.txt")
+            output_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_out_{block_id}.txt")
+            input_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_info_in_{block_id}.txt")
+            output_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_out_{block_id}.txt")
+            
+            # Decode id
+            result_id = subprocess.run([self.BCH_codec_path, self.config_path, input_file_id, output_file_id, "decode"], 
+                                       capture_output=True, text=True)
+            # Decode information part
+            result_info = subprocess.run([self.BCH_codec_path, self.config_path, input_file_info, output_file_info, "decode"],
+                                          capture_output=True, text=True)
+            # print(result_id.stdout)  # Print the output from the BCH decoder
+            print(result_id.stderr)  # Print any error messages from the BCH decoder
+            print(result_info.stderr)  # Print any error messages from the BCH decoder
+            # Read each line and obtain the bits seperated by ','. each row is of length n_0.
+            id_block = []
+            for line in open(output_file_id, encoding='utf-8'):
+                bits = line.strip().split(',')
+                id_block.append(bits)
+            id_block = np.array(id_block,dtype=np.uint8)
+
+            info_block = []
+            for line in open(output_file_info, encoding='utf-8'):
+                bits = line.strip().split(',')
+                info_block.append(bits)
+            info_block = np.array(info_block, dtype=np.uint8)
+
+            out_pool.append(np.concatenate((id_block, info_block), axis=1))
+        return out_pool
+    def pool_to_txt(self, pool, file_id):
+        '''
+        output each pool to .txt file for BCH decode.
+        '''
+        for block_id, block in enumerate(pool):
+            bch_decode_id_input_path = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_in_{block_id}.txt")
+            bch_decode_info_input_path = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_in_{block_id}.txt")
+            with open(bch_decode_id_input_path, "w", encoding='utf-8') as f:
+                for seq in block[0]:
+                    line = ','.join(map(str, seq))
+                    f.write(line + '\n')
+            with open(bch_decode_info_input_path, "w", encoding='utf-8') as f:
+                for seq in block[1]:
+                    line = ','.join(map(str, seq))
+                    f.write(line + '\n')
+        print(f'Channel output saved to: {self.mid_data_folder}')
+
 def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), inner2 = (80,20)):
     '''
     Save coding parameters to config file in JSON format.
@@ -763,7 +832,7 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
     '''
     # Read existing padding info if it exists
     if os.path.exists(config_path):
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding='utf-8') as f:
             try:
                 config_data = json.load(f)
             except json.JSONDecodeError:
