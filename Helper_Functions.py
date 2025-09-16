@@ -720,8 +720,8 @@ class BCH_Codec:
         self.n2 = coding_config["ECC"]["inner2"]["n"]
         self.n0 = coding_config["ECC"]["outer"]["n"]
         self.BCH_codec_path = coding_config["ECC"]["BCH_codec_exe"]
-        self.mid_data_folder = "./mid_data/"
-        self.config_path = "./config/config.json"
+        self.mid_data_folder = "D:/mycode/COPDS/Mid_data/"
+        self.config_path = "D:/mycode/COPDS/config/config.json"
         # Call BCH decoder executable to encode ids in the initialization
         ids  = np.array([int_to_binary_array(id, self.k1) for id in range(self.n0)],dtype = np.uint8).T
         input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
@@ -777,48 +777,50 @@ class BCH_Codec:
         block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
         for block_id in range(block_num):
             # Decode id and information bit by BCH encoder.
-            input_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_id_in_{block_id}.txt")
+            input_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_in_{block_id}.txt")
             output_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_out_{block_id}.txt")
-            input_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_info_in_{block_id}.txt")
+            input_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_in_{block_id}.txt")
             output_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_out_{block_id}.txt")
             
             # Decode id
             result_id = subprocess.run([self.BCH_codec_path, self.config_path, input_file_id, output_file_id, "decode"], 
-                                       capture_output=True, text=True)
+                                       check=True, text=True)
+            # print(result_id.stdout)  # Print the output from the BCH decoder
+            # print(result_id.stderr)  # Print any error messages from the BCH decoder            
             # Decode information part
             result_info = subprocess.run([self.BCH_codec_path, self.config_path, input_file_info, output_file_info, "decode"],
-                                          capture_output=True, text=True)
-            # print(result_id.stdout)  # Print the output from the BCH decoder
-            print(result_id.stderr)  # Print any error messages from the BCH decoder
-            print(result_info.stderr)  # Print any error messages from the BCH decoder
+                                          check=True, text=True)
+            # print(result_info.stdout)  # Print the output from the BCH decoder
+            # print(result_info.stderr)  # Print any error messages from the BCH decoder
             # Read each line and obtain the bits seperated by ','. each row is of length n_0.
-            id_block = []
-            for line in open(output_file_id, encoding='utf-8'):
-                bits = line.strip().split(',')
-                id_block.append(bits)
-            id_block = np.array(id_block,dtype=np.uint8)
+            id_block = np.loadtxt(output_file_id, delimiter=',', dtype='i1')
+            info_block = np.loadtxt(output_file_info, delimiter=',', dtype='i1')
 
-            info_block = []
-            for line in open(output_file_info, encoding='utf-8'):
-                bits = line.strip().split(',')
-                info_block.append(bits)
-            info_block = np.array(info_block, dtype=np.uint8)
-
-            out_pool.append(np.concatenate((id_block, info_block), axis=1))
+            out_pool.append(np.concatenate((id_block.T, info_block.T), axis=1))
         return out_pool
     def pool_to_txt(self, pool, file_id):
         '''
         output each pool to .txt file for BCH decode.
+        input: 
+                pool: each pool is a list of two arrays,
+                the first array is id part, the second array is information part.
+                file_id: The ID of the file to decode.
+        output:
+                save the pool to .txt file for BCH decode.
+                for each block, two files will be generated:
+                {file_id}_BCH_decode_id_in_{block_id}.txt
+                {file_id}_BCH_decode_info_in_{block_id}.txt
+                bits in each line are seperated by ','.
         '''
         for block_id, block in enumerate(pool):
             bch_decode_id_input_path = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_in_{block_id}.txt")
             bch_decode_info_input_path = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_in_{block_id}.txt")
             with open(bch_decode_id_input_path, "w", encoding='utf-8') as f:
-                for seq in block[0]:
+                for seq in block[0].T: # transpose to get each row, to match the input format of BCH decoder
                     line = ','.join(map(str, seq))
                     f.write(line + '\n')
             with open(bch_decode_info_input_path, "w", encoding='utf-8') as f:
-                for seq in block[1]:
+                for seq in block[1].T:
                     line = ','.join(map(str, seq))
                     f.write(line + '\n')
         print(f'Channel output saved to: {self.mid_data_folder}')

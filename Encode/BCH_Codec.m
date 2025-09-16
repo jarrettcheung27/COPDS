@@ -28,7 +28,7 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
     % Each row corresponds to a binary vector extracted from the string
     msgs = cell2mat(cellfun(@(x) int8(x) - '0', msgs, 'UniformOutput', false));
     n_0 = length(msgs(1,:));
-    disp(['BCH Encoding, mode: ',mode]);
+    disp(['BCH mode: ',mode]);
     if mode == "encode" % Encode mode
         disp(['Length of each row: ',num2str(length(msgs(:,1)))])
         % recognize layer
@@ -39,7 +39,8 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
             k_bch = k2_bch;
             n_bch = n2_bch;
         else
-            error('Input messages length does not match any BCH configuration.');
+            error(["Input messages length does not match any BCH configuration."]);
+            disp(["Input messages length: ", str2double(length(msgs(:,1)))]);
         end
         % Generate BCH generator polynomial
         bchEncoder = comm.BCHEncoder(n_bch, k_bch);
@@ -52,6 +53,8 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
         writematrix(temp,outfile_path);
   
     else % Decode mode
+        msgs = readmatrix(infile_path);
+        [info_len, reads_num] = size(msgs);
         % recognize layer
         if length(msgs(:,1)) == n1_bch
             k_bch = k1_bch;
@@ -60,14 +63,17 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
             k_bch = k2_bch;
             n_bch = n2_bch;
         else
+            disp(["Input messages length: ", num2str(length(msgs(:,1)))]);
             error('Input messages length does not match any BCH configuration.');
         end
         % Generate BCH generator polynomial
-        bchEncoder = comm.BCDecoder(n_bch, k_bch);
-        temp = zeros(k_bch+1,n_0);
-        for i = 1 : n_0
+        bchDecoder = comm.BCHDecoder(n_bch, k_bch);
+        temp = zeros(k_bch,reads_num);
+        for i = 1 : reads_num
             % Encode the messages
-            temp(:,i) = bchEncoder(msgs(:,i));
+            % disp(bchDecoder(msgs(:,i)));
+            temp(:,i) = bchDecoder(msgs(:,i));
+            
         end
         % Write codewords to the outfile_path(.txt)
         writematrix(temp,outfile_path);
