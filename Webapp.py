@@ -193,7 +193,7 @@ print('DNA to binary conversion completed.')
 print('Number of pools:', len(Library))
 print('Number of blocks in each pool:', [len(pool) for pool in Library])
 
-
+'''
 print('Voting and decoding...')
 BCH = BCH_Codec(coding_config = coding_config)
 for i, pool in enumerate(Library):
@@ -219,3 +219,48 @@ for i, pool in enumerate(Library):
     LDPC = LDPC_Codec(coding_config = coding_config)
     LDPC.decode(prob_pool,file_id=file_ids[i])
 print('LDPC decoding completed.')
+'''
+
+
+st.header('Image Reconstruction')
+# Read decoded output to reconstruct the image
+
+# Read the config file to obtain the configuration.
+decoded_chunks = []
+for i in range(len(Library)):
+    file_id = out_file_ids[i]
+
+    block_num = coding_config['files'][file_id]["segmentation"]["block_num"]
+    chunk_num = coding_config['files'][file_id]["segmentation"]["chunk_num"]
+    pad_size = coding_config['files'][file_id]["segmentation"]["pad_size"]
+    for block_idx in range(block_num):
+        ldpc_output_file = "./Mid_data/" + f"{file_id}_LDPC_encode_out_{block_id}.txt"
+        with open(ldpc_output_file, "r") as f:
+            pool_bits = [line.strip() for line in f]
+            # Transpose: each line is a bit position, columns are chunks
+            pool_bits_T = list(zip(*pool_bits))
+            for chunk_bits_tuple in pool_bits_T:
+                chunk_bits = ''.join(chunk_bits_tuple)
+                chunk_bytes = bits2bytes(chunk_bits)
+                decoded_chunks.append(chunk_bytes)
+
+    # Remove padding chunks if pad decoded_chunks number > original chunk number
+    decoded_chunks = decoded_chunks[:chunk_num]
+
+    # Remove padding bytes in the last chunk if pad_size > 0
+    if pad_size > 0:
+        last_chunk = decoded_chunks[-1]
+        if len(last_chunk) > pad_size:
+            decoded_chunks[-1] = last_chunk[:-pad_size]  # Remove padding bytes from the last chunk 
+
+    # Save reconstructed image
+    file_name = coding_config['files'][file_id]["file_name"]
+
+    restore_file_folder = "./Restored_files/"
+    if not os.path.exists(restore_file_folder):
+        os.makedirs(restore_file_folder)
+    out_file_path = os.path.join(restore_file_folder, file_name)
+    with open(out_file_path, "wb") as f:
+        for chunk in decoded_chunks:
+            f.write(chunk)
+    st.success(f"Image reconstructed and saved as {out_file_path}")

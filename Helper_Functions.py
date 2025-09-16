@@ -875,7 +875,7 @@ def voting(block, coding_config):
     for i, Id in enumerate(ids):
         inf = ''.join(map(str, infos[i]))
         num = nums[i]
-        if Id <= n_0: 
+        if Id < n_0: # Only consider valid index bits; Id starts from 0 
             if Id not in result:
                 result[Id] = {inf: num}
             else:
@@ -889,6 +889,7 @@ def voting(block, coding_config):
     for i in range(n_0):
         if i not in result:
             result[i] = {}
+    print(f'Number of valid segments after BCH decoding: {len(result)}')
     # voting
     voting_result = [] # Store the voting result
     for Id, inf_dict in result.items():
