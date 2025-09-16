@@ -184,7 +184,11 @@ temp = []
 for pool in DNA_Library: # 提取出已选择的文件对应的DNA池，并转换为二进制数据
     out_data_pool = DNA_pool_to_binary_pool(coding_config,pool)
     temp.append(out_data_pool)
+    print(out_data_pool[0][0].shape)
+    print(out_data_pool[0][1].shape)
+    print(out_data_pool[0][2].shape)
 Library = temp
+
 print('DNA to binary conversion completed.')
 print('Number of pools:', len(Library))
 print('Number of blocks in each pool:', [len(pool) for pool in Library])
@@ -194,15 +198,24 @@ print('Voting and decoding...')
 BCH = BCH_Codec(coding_config = coding_config)
 for i, pool in enumerate(Library):
     # ============================== BCH Decoding ============================= #
+    nums = [pool[j][2] for j in range(len(pool))] # record the reads number for each sequence.
     BCH.pool_to_txt(pool = pool, file_id = file_ids[i])
     pool = BCH.decode(file_ids[i])
-    
+    temp = []
+    for j, block in enumerate(pool):
+        block.append(nums[j])
+        temp.append(block)
+    pool = temp
     # Cluster the sequences with the same index in each pool
     prob_pool = [] # Store the voting results for each pool
-    for chunk in pool:
-        temp = voting(chunk, coding_config)
+    for j, block in enumerate(pool):
+        print(f'Voting for block {j} in pool {i}...')
+        temp = voting(block, coding_config)
         prob_pool.append(temp) # Probability of each bit in the voting result, for LDPC decoding
+        # pdb.set_trace()
+    
     # ===================== LDPC Decoding ===================== #
+    print('LDPC Decoding...')
     LDPC = LDPC_Codec(coding_config = coding_config)
     LDPC.decode(prob_pool,file_id=file_ids[i])
 print('LDPC decoding completed.')

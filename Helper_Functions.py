@@ -586,8 +586,9 @@ def extract_dnas(out_dnas):
     '''
     result = {}
     for dna_set in out_dnas:
-        for dna_error_profile in dna_set['re']:
-            result[dna_error_profile[2]] = dna_error_profile[0]
+        for dna_error_profile in dna_set['re']:# Only obtian the DNA don't loss 
+                if dna_error_profile[0] != 0: # 
+                    result[dna_error_profile[2]] = dna_error_profile[0]
     return result
 
 
@@ -671,14 +672,15 @@ class LDPC_Codec:
         # print('LDPC Decoding...')
         # Save as text file for LDPC decoder input (each line is a bit position, values are probabilities for each chunk)
         for chunk_id, v_score in enumerate(out_prob_pools):
-            input_file = self.mid_data_folder + f"{file_id}_decode_in_{chunk_id}.txt"
-            output_file = self.mid_data_folder + f"{file_id}_decode_out_{chunk_id}.txt"
-            
+            input_file = self.mid_data_folder + f"{file_id}_LDPC_decode_in_{chunk_id}.txt"
+            output_file = self.mid_data_folder + f"{file_id}_LDPC_decode_out_{chunk_id}.txt"
+
             np.savetxt(input_file, v_score, fmt="%.3f", delimiter=" ")
             # Call LDPC decoder executable
+            print('The size of current vscore is:', v_score.shape)
             mode = "decode"
-            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            # print(result.stdout)  # Print the output from the LDPC decoder
+            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], check=True, text=True)
+            print(result.stdout)  # Print the output from the LDPC decoder
             print(result.stderr)  # Print any error messages from the LDPC decoder
 
 def transpose_v2h(data_pools):
@@ -771,7 +773,7 @@ class BCH_Codec:
         Input:
             file_id: The ID of the file to decode.
         Output:
-            The concatenation of id codeword and data codeword alone row.
+            A list of blocks, each block is an list with  two arrays [id part, information part].
         '''
         out_pool = []
         block_num = self.coding_config["files"][file_id]['segmentation']['block_num']
@@ -792,11 +794,11 @@ class BCH_Codec:
                                           check=True, text=True)
             # print(result_info.stdout)  # Print the output from the BCH decoder
             # print(result_info.stderr)  # Print any error messages from the BCH decoder
-            # Read each line and obtain the bits seperated by ','. each row is of length n_0.
-            id_block = np.loadtxt(output_file_id, delimiter=',', dtype='i1')
-            info_block = np.loadtxt(output_file_info, delimiter=',', dtype='i1')
+            # Read each line and obtain the bits separated by ','. each row is of length n_0.
+            id_block = np.loadtxt(output_file_id, delimiter=',', dtype=np.uint8)
+            info_block = np.loadtxt(output_file_info, delimiter=',', dtype=np.uint8)
 
-            out_pool.append(np.concatenate((id_block.T, info_block.T), axis=1))
+            out_pool.append([id_block.T, info_block.T])
         return out_pool
     def pool_to_txt(self, pool, file_id):
         '''
@@ -848,7 +850,7 @@ def save_coding_config(config_path, outer_code = (1000, 800), inner1 = (20,10), 
         json.dump(config_data, f, indent=4, ensure_ascii=False)
 
 # ----------------------voting----------------------------#
-def voting(pool, coding_config):
+def voting(block, coding_config):
     '''
     将相同index的序列聚类投票
     输入：
@@ -862,29 +864,34 @@ def voting(pool, coding_config):
     index_length = coding_config["ECC"]["inner1"]["k"]
     # prepare the segments for voting
     result = {} # Store the voting result in a dictionary
+    # 将二进制ids转换为十进制values
+    ids = block[0]
+    weights = 1 << np.arange(ids.shape[1]-1, -1, -1)
+    ids = ids.dot(weights)   # array([11, 4, 14])
 
-    for segment in pool:
-        ids = segment[0]  # Index bits
-        inf = segment[1]
-        num = segment[2]  # Number of sequences with the same index
-        
-        if int(ids,2) <= n_0: 
-            if ids not in result:
-                result[ids] = {inf: num}
+    infos = block[1]
+    nums = block[2]
+     # Iterate through each chunk and group by index bits
+    for i, Id in enumerate(ids):
+        inf = ''.join(map(str, infos[i]))
+        num = nums[i]
+        if Id <= n_0: 
+            if Id not in result:
+                result[Id] = {inf: num}
             else:
-                if inf in result[ids]:
-                    result[ids][inf] += num
+                if inf in result[Id]:
+                    result[Id][inf] += num
                 else:
-                    result[ids][inf] = num
+                    result[Id][inf] = num
+    # sort result by index bits
+    result = dict(sorted(result.items()))  # Sort by index bits
     # if some ids are missing, fill them with empty dictionaries, key are the index bits of length index_length in binary
     for i in range(n_0):
-        if f"{i:0{index_length}b}" not in result:
-            result[f"{i:0{index_length}b}"] = {}
-    # sort result by index bits
-    result = dict(sorted(result.items(), key=lambda x: int(x[0], 2)))  # Sort by index bits
+        if i not in result:
+            result[i] = {}
     # voting
     voting_result = [] # Store the voting result
-    for ids, inf_dict in result.items():
+    for Id, inf_dict in result.items():
         # Sort the information bits by their counts
         sorted_infs = sorted(inf_dict.items(), key=lambda x: x[1], reverse=True)
         # Calculate the average of the most frequent information bits

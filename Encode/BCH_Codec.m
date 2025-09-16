@@ -66,6 +66,7 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
             disp(["Input messages length: ", num2str(length(msgs(:,1)))]);
             error('Input messages length does not match any BCH configuration.');
         end
+        disp(['input reads num: ',num2str(reads_num)])
         % Generate BCH generator polynomial
         bchDecoder = comm.BCHDecoder(n_bch, k_bch);
         temp = zeros(k_bch,reads_num);
@@ -75,6 +76,8 @@ function BCH_Codec(config_path, infile_path, outfile_path, mode)
             temp(:,i) = bchDecoder(msgs(:,i));
             
         end
+        [info_len, reads_num] = size(temp);
+        disp(['output reads num: ',num2str(reads_num)])
         % Write codewords to the outfile_path(.txt)
         writematrix(temp,outfile_path);
     end
