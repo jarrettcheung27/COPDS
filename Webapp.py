@@ -91,48 +91,46 @@ if st.button("清空 DNA 库"):
 with st.form(key="selectMode"): # key 是这个表单的标识符
     st.session_state['mode'] = st.selectbox('模式', ['编码并存入 DNA 库', '从 DNA 库中读取并译码',])
     mode_submitted  = st.form_submit_button("提交")
+# ------------ Choosing parameters -------------- # 
+st.sidebar.subheader('编码参数')
+chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320, disabled=True)
+k_0 = st.sidebar.number_input('外码信息位长度 $k_0$', min_value = 1024, max_value = 1024, value = 1024, disabled=True)
+n_0 = st.sidebar.number_input('外码码长 $n_0$', min_value = 2048, max_value = 2048, value = 2048, disabled=True)
+k_1 = st.sidebar.number_input('索引长度 $k_1$', min_value = 14, max_value = 14, value = 14, disabled=True)
+r_1 = st.sidebar.number_input('第一层TL-BCH冗余 $r_1$', min_value = 15, max_value = 15, value = 15, disabled=True)
+k_2 = chunk_size
+r_2 = st.sidebar.number_input('第二层TL-BCH冗余 $r_2$', min_value = 99, max_value = 99, value = 99, disabled=True)
+# --------------------Channel parameter----------------
+arg = config.DEFAULT_PASSER
+st.subheader('DNA数据存储信道参数')
+with st.form(key="channelParams"): # 创建一个表单
+    # synthesis stage
+    arg.syn_sub_prob = st.slider('信道噪声水平', min_value = 0.01, max_value = 0.4, value = 0.01) / 3 # 3 kinds of errors
+    arg.syn_number = st.slider('合成数量', min_value = 10, max_value = 50, value = 20)
+    arg.syn_yield = st.slider('合成产率', min_value = 0.98, max_value = 0.9999, value = 0.9999)
 
+    # PCR stage
+    arg.pcrc = st.slider('PCR循环次数',min_value = 0, max_value =20,value =1)
+    arg.pcrp = st.number_input('PCR概率',min_value = 0.5, max_value = 1.0,value = 0.9)
+
+    # decay stage
+    arg.decay_er = 0
+    arg.decay_loss_rate = 0.01
+
+    # sequencing stage
+    seq_platform = st.selectbox('测序平台',['Illumina测序','纳米孔'])
+    if seq_platform == 'Illumina测序':
+        arg.seq_TM = config.TM_NGS
+    else:
+        arg.seq_TM = config.TM_NNP
+    arg.sam_ratio = st.slider('采样比例',min_value = 0.0, max_value =1.0,value = 1.0)
+    arg.seq_depth = st.slider('测序深度', min_value = 1, max_value = 100, value = 10)
+
+    # inspect index
+    index = st.slider('查看索引', max_value = 600, value = 0)
+
+    channel_submitted  = st.form_submit_button("提交") # 提交表单
 if st.session_state['mode'] == '编码并存入 DNA 库':
-    # ------------ Choosing parameters -------------- # 
-    st.sidebar.subheader('编码参数')
-    chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320, disabled=True)
-    k_0 = st.sidebar.number_input('外码信息位长度 $k_0$', min_value = 1024, max_value = 1024, value = 1024, disabled=True)
-    n_0 = st.sidebar.number_input('外码码长 $n_0$', min_value = 2048, max_value = 2048, value = 2048, disabled=True)
-    k_1 = st.sidebar.number_input('索引长度 $k_1$', min_value = 14, max_value = 14, value = 14, disabled=True)
-    r_1 = st.sidebar.number_input('第一层TL-BCH冗余 $r_1$', min_value = 15, max_value = 15, value = 15, disabled=True)
-    k_2 = chunk_size
-    r_2 = st.sidebar.number_input('第二层TL-BCH冗余 $r_2$', min_value = 99, max_value = 99, value = 99, disabled=True)
-    # --------------------Channel parameter----------------
-    arg = config.DEFAULT_PASSER
-    st.subheader('DNA数据存储信道参数')
-    with st.form(key="channelParams"): # 创建一个表单
-        # synthesis stage
-        arg.syn_sub_prob = st.slider('信道噪声水平', min_value = 0.01, max_value = 0.4, value = 0.01) / 3 # 3 kinds of errors
-        arg.syn_number = st.slider('合成数量', min_value = 10, max_value = 50, value = 20)
-        arg.syn_yield = st.slider('合成产率', min_value = 0.98, max_value = 0.9999, value = 0.9999)
-
-        # PCR stage
-        arg.pcrc = st.slider('PCR循环次数',min_value = 0, max_value =20,value =1)
-        arg.pcrp = st.number_input('PCR概率',min_value = 0.5, max_value = 1.0,value = 0.9)
-
-        # decay stage
-        arg.decay_er = 0
-        arg.decay_loss_rate = 0.01
-
-        # sequencing stage
-        seq_platform = st.selectbox('测序平台',['Illumina测序','纳米孔'])
-        if seq_platform == 'Illumina测序':
-            arg.seq_TM = config.TM_NGS
-        else:
-            arg.seq_TM = config.TM_NNP
-        arg.sam_ratio = st.slider('采样比例',min_value = 0.0, max_value =1.0,value = 1.0)
-        arg.seq_depth = st.slider('测序深度', min_value = 1, max_value = 100, value = 10)
-
-        # inspect index
-        index = st.slider('查看索引', max_value = 600, value = 0)
-
-        channel_submitted  = st.form_submit_button("提交") # 提交表单
-
     st.header('上传文件')
     with st.form(key='select_file'):
         # 使用file_uploader 上传多张图片
