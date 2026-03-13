@@ -1,0 +1,98 @@
+[metadata]
+command=aff3ct -C "TPC" -K "106" -N "127" --enc-ext -m "2.5" -M "4.5" -s "0.25" -T "3" --dec-ite "8" --dec-t "0" --dec-c "0" --dec-p "5" -e "100" --chn-type "AWGN" --chn-implem "FAST" --src-type "RAND" --src-implem "FAST" --dec-alpha "0.5,0.5,1,1,1,1,1.2" --dec-cp-coef "0,0.25,0,0,3"
+title=TPC BCH (128,106,3) 8it p5
+
+[trace]
+# ----------------------------------------------------
+# ---- A FAST FORWARD ERROR CORRECTION TOOLBOX >> ----
+# ----------------------------------------------------
+# Parameters :
+# * Simulation ------------------------------------
+#    ** Type                        = BFER
+#    ** Type of bits                = int32
+#    ** Type of reals               = float32
+#    ** Date (UTC)                  = 2018-07-23 12:50:14
+#    ** Git version                 = v1.3.2-823-ga5bd556
+#    ** Code type (C)               = TPC
+#    ** Noise range                 = 2.5 -> 4.5 dB
+#    ** Noise type (E)              = EBN0
+#    ** Seed                        = 0
+#    ** Statistics                  = off
+#    ** Debug mode                  = off
+#    ** Multi-threading (t)         = 48 thread(s)
+#    ** Coset approach (c)          = no
+#    ** Coded monitoring            = no
+#    ** Bad frames tracking         = off
+#    ** Bad frames replay           = off
+#    ** Bit rate                    = 0.685791 (2809/4096)
+#    ** Inter frame level           = 1
+# * Source ----------------------------------------
+#    ** Type                        = RAND
+#    ** Implementation              = FAST
+#    ** Info. bits (K_info)         = 11236
+# * Codec -----------------------------------------
+#    ** Type                        = TPC
+#    ** Info. bits (K)              = 11236
+#    ** Codeword size (N_cw)        = 16384
+#    ** Frame size (N)              = 16384
+#    ** Code rate                   = 0.685791 (2809/4096)
+# * Encoder ---------------------------------------
+#    ** Type                        = TPC
+#    ** Systematic                  = yes
+#    ** Parity extended             = yes
+#    Encoder --------------------------------------
+#    ** Type                        = BCH
+#    ** Systematic                  = yes
+# * Interleaver -----------------------------------
+#    ** Type                        = ROW_COL
+#    ** Number of columns           = 128
+# * Decoder ---------------------------------------
+#    ** Type (D)                    = CP
+#    ** Implementation              = STD
+#    ** Systematic                  = yes
+#    ** Num. of iterations (i)      = 8
+#    ** alpha                       = {0.5, 0.5, 1, 1, 1, 1, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2}
+#    ** Chase Pyndiah coeff.        = {0, 0.25, 0, 0, 3}
+#    ** Num. least reliable pos (p) = 5
+#    ** Num. test vectors (t)       = 0
+#    ** Num. competitors (c)        = 0
+#    ** Parity extended             = yes
+#    Decoder --------------------------------------
+#    ** Type (D)                    = ALGEBRAIC
+#    ** Implementation              = STD
+#    ** Systematic                  = yes
+#    ** Galois field order (m)      = 7
+#    ** Correction power (T)        = 3
+# * Modem -----------------------------------------
+#    ** Type                        = BPSK
+#    ** Implementation              = STD
+#    ** Bits per symbol             = 1
+#    ** Sampling factor             = 1
+#    ** Sigma square                = on
+# * Channel ---------------------------------------
+#    ** Type                        = AWGN
+#    ** Implementation              = FAST
+#    ** Complex                     = off
+#    ** Add users                   = off
+# * Monitor ---------------------------------------
+#    ** Frame error count (e)       = 100
+#    ** Compute mutual info         = no
+# * Terminal --------------------------------------
+#    ** Enabled                     = yes
+#    ** Frequency (ms)              = 500
+#
+# The simulation is running...
+# ---------------------||------------------------------------------------------||---------------------
+#  Signal Noise Ratio  ||   Bit Error Rate (BER) and Frame Error Rate (FER)    ||  Global throughput
+#         (SNR)        ||                                                      ||  and elapsed time
+# ---------------------||------------------------------------------------------||---------------------
+# ----------|----------||----------|----------|----------|----------|----------||----------|----------
+#     Es/N0 |    Eb/N0 ||      FRA |       BE |       FE |      BER |      FER ||  SIM_THR |    ET/RT
+#      (dB) |     (dB) ||          |          |          |          |          ||   (Mb/s) | (hhmmss)
+# ----------|----------||----------|----------|----------|----------|----------||----------|----------
+       0.86 |     2.50 ||      186 |    79681 |      167 | 3.81e-02 | 8.98e-01 ||    0.677 | 00h00'03
+       1.11 |     2.75 ||     1578 |    19179 |      103 | 1.08e-03 | 6.53e-02 ||    1.001 | 00h00'17
+       1.26 |     2.90 ||   254414 |    12164 |      100 | 4.26e-06 | 3.93e-04 ||    1.020 | 00h46'42
+       1.36 |     3.00 ||  6495098 |     1888 |       21 | 2.59e-08 | 3.23e-06 ||    1.026 | 19h45'27  x
+       1.41 |     3.05 || 1.55e+08 |     1280 |       23 | 7.34e-10 | 1.48e-07 ||    1.136 |426h22'43  x
+# End of the simulation.

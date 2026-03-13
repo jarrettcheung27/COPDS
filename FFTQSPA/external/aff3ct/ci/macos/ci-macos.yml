@@ -1,0 +1,30 @@
+######################
+## build macos jobs ##
+######################
+
+build-macos-clang-x64-sse4.2:
+  stage: build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    CC: clang
+    CXX: clang++
+    CFLAGS: -Wall -Wno-overloaded-virtual -funroll-loops -m64 -msse4.2
+    CMAKE_OPT: -DAFF3CT_COMPILE_EXE=ON -DAFF3CT_COMPILE_STATIC_LIB=ON -DAFF3CT_COMPILE_SHARED_LIB=ON -DAFF3CT_PREC=MULTI -DAFF3CT_EXT_STRINGS=OFF
+    NAME: build_macos_clang_x64_sse4.2
+  needs:
+    - job: analysis-cppcheck
+      artifacts: false
+    - job: analysis-headers
+      artifacts: false
+    - job: analysis-documentation
+      artifacts: true
+  tags:
+    - x86_64
+    - macos
+  artifacts:
+    name: build-macos-clang-x64-sse4.2
+    paths:
+      - build_macos_clang_x64_sse4.2
+  script:
+    - source ./ci/tools/threads.sh
+    - ./ci/build-linux-macos.sh

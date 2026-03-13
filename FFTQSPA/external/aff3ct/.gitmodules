@@ -1,0 +1,18 @@
+[submodule "lib/MIPP"]
+	path = lib/MIPP
+	url = ../MIPP
+[submodule "conf"]
+	path = conf
+	url = ../configuration_files
+[submodule "refs"]
+	path = refs
+	url = ../error_rate_references
+[submodule "lib/date"]
+	path = lib/date
+	url = https://github.com/HowardHinnant/date.git
+[submodule "lib/cli"]
+	path = lib/cli
+	url = ../cli
+[submodule "lib/streampu"]
+	path = lib/streampu
+	url = ../streampu

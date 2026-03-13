@@ -1,0 +1,9 @@
+[submodule "lib/rang"]
+	path = lib/rang
+	url = https://github.com/agauniyal/rang.git
+[submodule "lib/cpptrace"]
+	path = lib/cpptrace
+	url = https://github.com/jeremy-rifkin/cpptrace.git
+[submodule "lib/json"]
+	path = lib/json
+	url = https://github.com/nlohmann/json.git

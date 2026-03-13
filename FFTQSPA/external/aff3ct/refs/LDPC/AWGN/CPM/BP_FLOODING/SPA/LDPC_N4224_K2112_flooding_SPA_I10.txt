@@ -1,0 +1,99 @@
+[metadata]
+command=aff3ct -C LDPC --sim-type BFERI --sim-prec 32 -m 0.0 -M 2.51 -s 0.25 -K 2112 -N 4224 --sim-coset --src-type RAND --src-implem FAST --itl-type USER --itl-path conf/itl/GSM-LDPC_4224.itl --mdm-type CPM --chn-type AWGN --chn-implem FAST --sim-ite 10 --dec-type BP_FLOODING --dec-h-path conf/dec/LDPC/GSM_2112_4224.alist --dec-implem SPA --dec-ite 1 --mnt-max-fe 100 --mdm-max MAXS --mdm-cpm-std GSM
+title=LDPC (4224,2112) GSM-SPA 10 turbo ite.
+
+[trace]
+# ----------------------------------------------------
+# ---- A FAST FORWARD ERROR CORRECTION TOOLBOX >> ----
+# ----------------------------------------------------
+# Parameters :
+# * Simulation ------------------------------------
+#    ** Type                      = BFERI
+#    ** Type of bits              = int32
+#    ** Type of reals             = float32
+#    ** Date (UTC)                = 2018-05-17 14:21:33
+#    ** Git version               = v1.3.2-470-gf8de061
+#    ** Code type (C)             = LDPC
+#    ** Noise range               = 0 -> 2.5 dB
+#    ** Noise type (E)            = EBN0
+#    ** Seed                      = 0
+#    ** Statistics                = off
+#    ** Debug mode                = off
+#    ** Multi-threading (t)       = 4 thread(s)
+#    ** Coset approach (c)        = yes
+#    ** Coded monitoring          = no
+#    ** Bad frames tracking       = off
+#    ** Bad frames replay         = off
+#    ** Bit rate                  = 0.5 (1/2)
+#    ** Inter frame level         = 1
+#    ** Global iterations (I)     = 10
+# * Source ----------------------------------------
+#    ** Type                      = RAND
+#    ** Implementation            = FAST
+#    ** Info. bits (K_info)       = 2112
+# * Codec -----------------------------------------
+#    ** Type                      = LDPC
+#    ** Info. bits (K)            = 2112
+#    ** Codeword size (N_cw)      = 4224
+#    ** Frame size (N)            = 4224
+#    ** Code rate                 = 0.5 (1/2)
+# * Encoder ---------------------------------------
+#    ** Type                      = COSET
+#    ** Systematic                = yes
+# * Decoder ---------------------------------------
+#    ** Type (D)                  = BP_FLOODING
+#    ** Implementation            = SPA
+#    ** Systematic                = yes
+#    ** H matrix path             = conf/dec/LDPC/GSM_2112_4224.alist
+#    ** H matrix reordering       = NONE
+#    ** Num. of iterations (i)    = 1
+#    ** Stop criterion (syndrome) = on
+#    ** Stop criterion depth      = 1
+# * Interleaver -----------------------------------
+#    ** Type                      = USER
+#    ** Path                      = conf/itl/GSM-LDPC_4224.itl
+# * Modem -----------------------------------------
+#    ** Type                      = CPM
+#    ** Implementation            = STD
+#    ** CPM standard              = GSM
+#    ** CPM L memory              = 3
+#    ** CPM h index               = 1/2
+#    ** CPM wave shape            = GMSK
+#    ** CPM mapping               = NATURAL
+#    ** Bits per symbol           = 1
+#    ** Sampling factor           = 5
+#    ** Sigma square              = on
+#    ** Max type                  = MAXS
+# * Channel ---------------------------------------
+#    ** Type                      = AWGN
+#    ** Implementation            = FAST
+#    ** Complex                   = on
+#    ** Add users                 = off
+# * Monitor ---------------------------------------
+#    ** Frame error count (e)     = 100
+#    ** Compute mutual info       = no
+# * Terminal --------------------------------------
+#    ** Enabled                   = yes
+#    ** Frequency (ms)            = 500
+#
+# The simulation is running...
+# ----------------------------------------------------------------------||--------------------------------||---------------------
+#       Bit Error Rate (BER) and Frame Error Rate (FER) depending       ||     Decoder throughput and     ||  Global throughput
+#                    on the Signal Noise Ratio (SNR)                    ||      latency (per thread)      ||  and elapsed time
+# ----------------------------------------------------------------------||--------------------------------||---------------------
+# -------|-------|----------|----------|----------|----------|----------||----------|----------|----------||----------|----------
+#  Es/N0 | Eb/N0 |      FRA |       BE |       FE |      BER |      FER ||     CTHR |     ITHR |  LATENCY || SIM_CTHR |    ET/RT
+#   (dB) |  (dB) |          |          |          |          |          ||   (Mb/s) |   (Mb/s) |     (us) ||   (Mb/s) | (hhmmss)
+# -------|-------|----------|----------|----------|----------|----------||----------|----------|----------||----------|----------
+   -3.01 |  0.00 |      147 |    70847 |      147 | 2.28e-01 | 1.00e+00 ||     0.25 |     0.12 | 17131.06 ||     0.42 | 00h00'01
+   -2.76 |  0.25 |      147 |    64538 |      147 | 2.08e-01 | 1.00e+00 ||     0.26 |     0.13 | 16139.07 ||     0.47 | 00h00'01
+   -2.51 |  0.50 |      147 |    57387 |      147 | 1.85e-01 | 1.00e+00 ||     0.26 |     0.13 | 16198.14 ||     0.54 | 00h00'01
+   -2.26 |  0.75 |      147 |    47851 |      147 | 1.54e-01 | 1.00e+00 ||     0.26 |     0.13 | 16191.62 ||     0.53 | 00h00'01
+   -2.01 |  1.00 |      147 |    34438 |      147 | 1.11e-01 | 1.00e+00 ||     0.26 |     0.13 | 16256.77 ||     0.51 | 00h00'01
+   -1.76 |  1.25 |      147 |    18252 |      146 | 5.88e-02 | 9.93e-01 ||     0.26 |     0.13 | 16053.18 ||     0.53 | 00h00'01
+   -1.51 |  1.50 |      170 |     6760 |      143 | 1.88e-02 | 8.41e-01 ||     0.26 |     0.13 | 16115.85 ||     0.55 | 00h00'01
+   -1.26 |  1.75 |      297 |     2052 |      113 | 3.27e-03 | 3.80e-01 ||     0.26 |     0.13 | 16037.01 ||     0.61 | 00h00'02
+   -1.01 |  2.00 |     1326 |      703 |      103 | 2.51e-04 | 7.77e-02 ||     0.28 |     0.14 | 15188.91 ||     0.67 | 00h00'08
+   -0.76 |  2.25 |     9268 |      354 |      101 | 1.81e-05 | 1.09e-02 ||     0.29 |     0.15 | 14529.01 ||     0.72 | 00h00'54
+   -0.51 |  2.50 |    64883 |      261 |      100 | 1.90e-06 | 1.54e-03 ||     0.30 |     0.15 | 13885.88 ||     0.73 | 00h06'15
+# End of the simulation.

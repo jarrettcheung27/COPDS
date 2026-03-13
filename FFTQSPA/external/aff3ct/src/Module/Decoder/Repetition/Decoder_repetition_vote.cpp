@@ -1,0 +1,51 @@
+#include <string>
+
+#include "Module/Decoder/Repetition/Decoder_repetition_vote.hpp"
+
+using namespace aff3ct;
+using namespace aff3ct::module;
+
+template<typename B, typename R>
+Decoder_repetition_vote<B, R>::Decoder_repetition_vote(const int& K, const int& N, const bool buffered_encoding)
+  : Decoder_repetition<B, R>(K, N, buffered_encoding)
+{
+    const std::string name = "Decoder_repetition_vote";
+    this->set_name(name);
+    for (auto& t : this->tasks)
+        t->set_replicability(true);
+}
+
+template<typename B, typename R>
+Decoder_repetition_vote<B, R>*
+Decoder_repetition_vote<B, R>::clone() const
+{
+    auto m = new Decoder_repetition_vote(*this);
+    m->deep_copy(*this);
+    return m;
+}
+
+template<typename B, typename R>
+int
+Decoder_repetition_vote<B, R>::_decode_siso_alt(const R* sys, const R* par, R* ext, const size_t /*frame_id*/)
+{
+    for (auto i = 0; i < this->K; i++)
+    {
+        ext[i] = (sys[i] > 0) ? 1 : -1;
+        for (auto j = 0; j < this->rep_count; j++)
+            ext[i] += (par[j * this->K + i] > 0) ? 1 : -1; // vote
+    }
+
+    return 0;
+}
+
+// ==================================================================================== explicit template instantiation
+#include "Tools/types.h"
+#ifdef AFF3CT_MULTI_PREC
+template class aff3ct::module::Decoder_repetition_vote<B_8, Q_8>;
+template class aff3ct::module::Decoder_repetition_vote<B_16, Q_16>;
+template class aff3ct::module::Decoder_repetition_vote<B_32, Q_32>;
+template class aff3ct::module::Decoder_repetition_vote<B_64, Q_64>;
+#else
+template class aff3ct::module::Decoder_repetition_vote<B, Q>;
+#endif
+// ==================================================================================== explicit template instantiation

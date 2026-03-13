@@ -1,7 +1,7 @@
 {
     "file_num": 1,
     "files": {
-        "7b8a758d-689b-4dbb-9061-b1118a702b59": {
+        "cbafb8aa-a18b-4171-8e7e-d1f81c9bcf3f": {
             "file_name": "Fruits.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -15,8 +15,8 @@
     },
     "ECC": {
         "outer": {
-            "n": 1334,
-            "k": 1000,
+            "n": 2048,
+            "k": 1024,
             "h_matrix_path": "./config/Hmatrix.txt",
             "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
         },
@@ -30,8 +30,5 @@
         },
         "BCH_codec_exe": "./Encode/BCH_Codec.exe"
     },
-    "DNA2Binary": {
-        "is_padding": true,
-        "padding": 0
-    }
+    "DNA2Binary": {}
 }

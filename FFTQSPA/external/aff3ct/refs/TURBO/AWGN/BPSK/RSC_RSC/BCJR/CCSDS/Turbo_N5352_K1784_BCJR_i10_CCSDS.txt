@@ -1,0 +1,109 @@
+[metadata]
+command=aff3ct -C TURBO -K 1784 -m 0.0 -M 0.91 --enc-sub-std CCSDS -i 10 --dec-sub-max MAXS
+title=Turbo (5368,1784) BCJR 10 ite. CCSDS
+
+[trace]
+# ----------------------------------------------------
+# ---- A FAST FORWARD ERROR CORRECTION TOOLBOX >> ----
+# ----------------------------------------------------
+# Parameters :
+# * Simulation ------------------------------------
+#    ** Type                   = BFER
+#    ** Type of bits           = int32
+#    ** Type of reals          = float32
+#    ** Date (UTC)             = 2018-05-17 14:30:02
+#    ** Git version            = v1.3.2-470-gf8de061
+#    ** Code type (C)          = TURBO
+#    ** Noise range            = 0 -> 0.9 dB
+#    ** Noise type (E)         = EBN0
+#    ** Seed                   = 0
+#    ** Statistics             = off
+#    ** Debug mode             = off
+#    ** Multi-threading (t)    = 4 thread(s)
+#    ** Coset approach (c)     = no
+#    ** Coded monitoring       = no
+#    ** Bad frames tracking    = off
+#    ** Bad frames replay      = off
+#    ** Bit rate               = 0.33234 (223/671)
+#    ** Inter frame level      = 1
+# * Source ----------------------------------------
+#    ** Type                   = RAND
+#    ** Implementation         = STD
+#    ** Info. bits (K_info)    = 1784
+# * Codec -----------------------------------------
+#    ** Type                   = TURBO
+#    ** Info. bits (K)         = 1784
+#    ** Codeword size (N_cw)   = 5368
+#    ** Frame size (N)         = 5368
+#    ** Code rate              = 0.33234 (223/671)
+# * Encoder ---------------------------------------
+#    ** Type                   = TURBO
+#    ** Systematic             = yes
+#    ** Tail length            = 16
+#    Encoder --------------------------------------
+#    ** Type                   = RSC
+#    ** Systematic             = yes
+#    ** Tail length            = 8
+#    ** Buffered               = on
+#    ** Standard               = CCSDS
+#    ** Polynomials            = {023,033}
+# * Interleaver -----------------------------------
+#    ** Type                   = CCSDS
+#    ** Size                   = 1784
+#    ** Inter frame level      = 1
+# * Decoder ---------------------------------------
+#    ** Type (D)               = TURBO
+#    ** Implementation         = FAST
+#    ** Systematic             = yes
+#    ** Num. of iterations (i) = 10
+#    ** Enable json            = off
+#    ** Self-corrected         = off
+#    Scaling factor -------------------------------
+#    ** Enabled                = no
+#    Flip and check -------------------------------
+#    ** Enabled                = no
+#    Decoder --------------------------------------
+#    ** Type (D)               = BCJR
+#    ** Implementation         = GENERIC
+#    ** Systematic             = yes
+#    ** Standard               = CCSDS
+#    ** Polynomials            = {023,033}
+#    ** Max type               = MAXS
+# * Modem -----------------------------------------
+#    ** Type                   = BPSK
+#    ** Implementation         = STD
+#    ** Bits per symbol        = 1
+#    ** Sampling factor        = 1
+#    ** Sigma square           = on
+# * Channel ---------------------------------------
+#    ** Type                   = AWGN
+#    ** Implementation         = STD
+#    ** Complex                = off
+#    ** Add users              = off
+# * Monitor ---------------------------------------
+#    ** Frame error count (e)  = 100
+#    ** Compute mutual info    = no
+# * Terminal --------------------------------------
+#    ** Enabled                = yes
+#    ** Frequency (ms)         = 500
+#
+# The simulation is running...
+# ----------------------------------------------------------------------||--------------------------------||---------------------
+#       Bit Error Rate (BER) and Frame Error Rate (FER) depending       ||     Decoder throughput and     ||  Global throughput
+#                    on the Signal Noise Ratio (SNR)                    ||      latency (per thread)      ||  and elapsed time
+# ----------------------------------------------------------------------||--------------------------------||---------------------
+# -------|-------|----------|----------|----------|----------|----------||----------|----------|----------||----------|----------
+#  Es/N0 | Eb/N0 |      FRA |       BE |       FE |      BER |      FER ||     CTHR |     ITHR |  LATENCY || SIM_CTHR |    ET/RT
+#   (dB) |  (dB) |          |          |          |          |          ||   (Mb/s) |   (Mb/s) |     (us) ||   (Mb/s) | (hhmmss)
+# -------|-------|----------|----------|----------|----------|----------||----------|----------|----------||----------|----------
+   -4.78 |  0.00 |      184 |    28089 |      138 | 8.56e-02 | 7.50e-01 ||     0.03 |     0.01 | 1.54e+05 ||     1.33 | 00h00'00
+   -4.68 |  0.10 |      251 |    23802 |      125 | 5.32e-02 | 4.98e-01 ||     0.04 |     0.01 | 1.53e+05 ||     1.56 | 00h00'00
+   -4.58 |  0.20 |      420 |    19443 |      112 | 2.59e-02 | 2.67e-01 ||     0.04 |     0.01 | 1.48e+05 ||     1.63 | 00h00'01
+   -4.48 |  0.30 |      868 |    16582 |      105 | 1.07e-02 | 1.21e-01 ||     0.04 |     0.01 | 1.38e+05 ||     1.80 | 00h00'02
+   -4.38 |  0.40 |     1868 |    16132 |      104 | 4.84e-03 | 5.57e-02 ||     0.04 |     0.01 | 1.35e+05 ||     1.87 | 00h00'05
+   -4.28 |  0.50 |     6262 |    13216 |      100 | 1.18e-03 | 1.60e-02 ||     0.04 |     0.01 | 1.27e+05 ||     2.01 | 00h00'16
+   -4.18 |  0.60 |    25750 |    13996 |      100 | 3.05e-04 | 3.88e-03 ||     0.04 |     0.01 | 1.25e+05 ||     2.04 | 00h01'07
+   -4.08 |  0.70 |   161267 |    12187 |      100 | 4.24e-05 | 6.20e-04 ||     0.04 |     0.01 | 1.22e+05 ||     2.09 | 00h06'52
+   -3.98 |  0.80 |  1235902 |    11049 |      100 | 5.01e-06 | 8.09e-05 ||     0.04 |     0.01 | 1.27e+05 ||     2.02 | 00h54'40
+   -3.88 |  0.90 |  7959794 |     8342 |      100 | 5.87e-07 | 1.26e-05 ||     0.04 |     0.01 | 1.19e+05 ||     2.14 | 05h31'04
+# End of the simulation.
