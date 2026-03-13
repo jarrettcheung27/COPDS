@@ -979,7 +979,7 @@ def bch_decode_and_vote_cpp(block, coding_config):
 # ----------------------Webapp----------------------------#
 def select_image():
     # Prompt user to select an image to store in DNA
-    uploaded_file = st.file_uploader("Select images to store in DNA", type=["jpg", "png"])
+    uploaded_file = st.file_uploader("选择要存入DNA的图片", type=["jpg", "png", "jpeg"])
     if uploaded_file is None:
         st.stop()  # Stop the process until an image is uploaded.
 

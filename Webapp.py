@@ -32,61 +32,61 @@ if DEBUG_MODE:
 # =========================== assigning parameters ========================= #
 print('Running Webapp...')
 with st.form(key="selectMode"): # key 是这个表单的标识符
-    st.session_state['mode'] = st.selectbox('Mode', ['Encode & Store in DNA', 'Restore from DNA',])
-    mode_submitted  = st.form_submit_button("Submit")
+    st.session_state['mode'] = st.selectbox('模式', ['编码并存入DNA池', '从DNA池中读取并译码',])
+    mode_submitted  = st.form_submit_button("提交")
 
-if st.session_state['mode'] == 'Encode & Store in DNA':
+if st.session_state['mode'] == '编码并存入DNA池':
     # ------------ Choosing parameters -------------- # 
-    st.sidebar.subheader('Coding Parameter')
-    chunk_size = st.sidebar.number_input('DNA chunk size', min_value = 320, max_value = 320, value = 320, disabled=True)
-    k_0 = st.sidebar.number_input('Block size $k_0$', min_value = 1024, max_value = 1024, value = 1024, disabled=True)
-    n_0 = st.sidebar.number_input('Outer code length $n_0$', min_value = 2048, max_value = 2048, value = 2048, disabled=True)
-    k_1 = st.sidebar.number_input('Index length $k_1$', min_value = 14, max_value = 14, value = 14, disabled=True)
-    r_1 = st.sidebar.number_input('Redundancy $r_1$ of the first layer of TL-BCH', min_value = 15, max_value = 15, value = 15, disabled=True)
+    st.sidebar.subheader('编码参数')
+    chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320, disabled=True)
+    k_0 = st.sidebar.number_input('外码信息位长度 $k_0$', min_value = 1024, max_value = 1024, value = 1024, disabled=True)
+    n_0 = st.sidebar.number_input('外码码长 $n_0$', min_value = 2048, max_value = 2048, value = 2048, disabled=True)
+    k_1 = st.sidebar.number_input('索引长度 $k_1$', min_value = 14, max_value = 14, value = 14, disabled=True)
+    r_1 = st.sidebar.number_input('第一层TL-BCH冗余 $r_1$', min_value = 15, max_value = 15, value = 15, disabled=True)
     k_2 = chunk_size
-    r_2 = st.sidebar.number_input('Redundancy $r_2$ of the second layer of TL-BCH', min_value = 99, max_value = 99, value = 99, disabled=True)
+    r_2 = st.sidebar.number_input('第二层TL-BCH冗余 $r_2$', min_value = 99, max_value = 99, value = 99, disabled=True)
     # --------------------Channel parameter----------------
     arg = config.DEFAULT_PASSER
-    st.subheader('Parameters of DNA data storage channel')
+    st.subheader('DNA数据存储信道参数')
     with st.form(key="channelParams"): # 创建一个表单
         # synthesis stage
-        arg.syn_number = st.slider('Syn number', min_value = 10, max_value = 50, value = 20)
+        arg.syn_number = st.slider('合成数量', min_value = 10, max_value = 50, value = 20)
         # arg.syn_sub_prob = st.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of errors
-        arg.syn_yield = st.slider('Syn Yield', min_value = 0.98, max_value = 0.9999, value = 0.9999)
+        arg.syn_yield = st.slider('合成产率', min_value = 0.98, max_value = 0.9999, value = 0.9999)
 
         # PCR stage
-        arg.pcrc = st.slider('PCR cycle',min_value = 0, max_value =20,value =1)
-        arg.pcrp = st.number_input('PCR prob',min_value = 0.5, max_value = 1.0,value = 0.9)
+        arg.pcrc = st.slider('PCR循环次数',min_value = 0, max_value =20,value =1)
+        arg.pcrp = st.number_input('PCR概率',min_value = 0.5, max_value = 1.0,value = 0.9)
 
         # decay stage
         arg.decay_er = 0
         arg.decay_loss_rate = 0.01
 
         # sequencing stage
-        seq_platform = st.selectbox('Sequencing Platform',['Illumina Sequencing','Nanopore'])
-        if seq_platform == 'Illumina Sequencing':
+        seq_platform = st.selectbox('测序平台',['Illumina测序','纳米孔'])
+        if seq_platform == 'Illumina测序':
             arg.seq_TM = config.TM_NGS
         else:
             arg.seq_TM = config.TM_NNP
-        arg.sam_ratio = st.slider('Sampling ratio',min_value = 0.0, max_value =1.0,value = 1.0)
-        arg.seq_depth = st.slider('Seq Depth', min_value = 1, max_value = 100, value = 10)
+        arg.sam_ratio = st.slider('采样比例',min_value = 0.0, max_value =1.0,value = 1.0)
+        arg.seq_depth = st.slider('测序深度', min_value = 1, max_value = 100, value = 10)
 
         # inspect index
-        index = st.slider('inspect index', max_value = 600, value = 0)
+        index = st.slider('查看索引', max_value = 600, value = 0)
 
-        channel_submitted  = st.form_submit_button("Submit") # 提交表单
+        channel_submitted  = st.form_submit_button("提交") # 提交表单
 
-    st.header('Upload file')
+    st.header('上传文件')
     with st.form(key='select_file'):
         # 使用file_uploader 上传多张图片
         uploaded_files = st.file_uploader(
-            "Select images to store in DNA",
+            "选择要存入DNA的图片",
             type=["jpg", "jpeg", "png"],
             accept_multiple_files=True,
             key="file_uploader"
         )
 
-        encode_submitted = st.form_submit_button("Submit")
+        encode_submitted = st.form_submit_button("提交")
 
     if uploaded_files is not None:
         for uploaded_file in uploaded_files:
@@ -95,11 +95,11 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
             st.image(image, caption="上传的图片", width=100)
 
     if not uploaded_files:
-        st.info("Please upload at least one image, then click Submit.")
+        st.info("请至少上传一张图片，然后点击提交。")
         st.stop()
 
     if not encode_submitted:
-        st.info("Upload images and click Submit to start encoding and storage.")
+        st.info("上传图片并点击提交开始编码与存储。")
         st.stop()
 
     if os.path.exists(CONFIG_PATH):
@@ -182,7 +182,7 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
 
 
     # =================================Encoding===================================#
-    'Processing encode...'
+    st.info('正在编码...')
     LDPC = LDPC_Codec(coding_config)
     BCH = BCH_Codec(coding_config)  # Initialize BCH codec with config path
     bch_encoded_library = []
@@ -200,9 +200,9 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
         bch_encoded_library.append(bch_encoded_pool)
     print('Encoding completed.')
     #===============================Binary to DNA===============================#
-    'Converting Binary data to DNA...'
+    st.info('正在转换二进制数据为DNA...')
     if not bch_encoded_library or not bch_encoded_library[0]:
-        st.error("BCH output is empty. Encoding aborted.")
+        st.error("BCH输出为空，编码已中止。")
         st.stop()
 
     total_bits = int(bch_encoded_library[0][0].shape[1])
@@ -241,7 +241,7 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
     print('Coding configuration saved to:', CONFIG_PATH)
     
     # ============================= DNA simulation Channel ============================= #
-    'Error simulation of the DNA data storage channel...'
+    st.info('正在模拟DNA数据存储信道...')
     Channel = DNA_Channel_Model(Modules = 0, arg = arg) # No model provided
 
     for i, dna_pools in enumerate(DNA_Library):
@@ -251,7 +251,7 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
             out_dnas = Channel(dnas)
             temp.append(out_dnas)
         DNA_Library[i] = temp
-    print('Simulation completed.')
+    print('仿真完成。')
 
     # --------------Save Simulation results ----------------
     for i, pool in enumerate(DNA_Library):
@@ -266,9 +266,9 @@ if st.session_state['mode'] == 'Encode & Store in DNA':
             # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
             json.dump(out_pool, file, ensure_ascii=False, indent=2)
     print('Simulated DNAs saved to ', DNA_LIB_DIR)
-    st.success('Files are stored into DNA pools.')
+    st.success('文件已存入DNA池。')
 
-elif st.session_state['mode'] == 'Restore from DNA':
+elif st.session_state['mode'] == '从DNA池中读取并译码':
         # ===================== Load the configuration file ===================== #
     config_path = "./config/config.json"
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -280,26 +280,26 @@ elif st.session_state['mode'] == 'Restore from DNA':
     store_file_num = coding_config['file_num']
 
     if store_file_num == 0:
-        st.warning("No files are stored in the DNA Library. Please upload files first.")
+        st.warning("DNA库中没有已存储的文件，请先上传文件。")
         st.stop()
     else:
         file_names = [coding_config['files'][id]['file_name'] for id in file_ids]
         file_ids = list(coding_config['files'].keys())
         with st.form(key="restoreFiles"): # 创建表单
             out_file_names = st.multiselect(
-                "Select files to restore",
+                "选择要恢复的文件",
                 options=file_names,
                 default=[file_names[0]]  # Default to the first file
             )
-            restore_submitted  = st.form_submit_button("Submit")
+            restore_submitted  = st.form_submit_button("提交")
 
     if not restore_submitted:
-        st.info("Select files and click Submit to start restoration.")
+        st.info("选择文件并点击提交开始恢复。")
         st.stop()
     # -------------- obtain the IDs of the selected files --------------
     out_file_ids = [file_ids[i] for i, name in enumerate(file_names) if name in out_file_names]
     if not out_file_ids:
-        st.warning("No files selected for restoration.")
+        st.warning("未选择任何要恢复的文件。")
         st.stop()
     print(f'Selected files: {out_file_names}, IDs: {out_file_ids}')
 
@@ -313,14 +313,14 @@ elif st.session_state['mode'] == 'Restore from DNA':
         out_dna_pool = []
         out_dna_path = os.path.join(DNA_LIB_DIR, f"{file_id}_out.dna")
         if not os.path.exists(out_dna_path):
-            st.error(f"DNA pool file not found: {out_dna_path}")
+            st.error(f"未找到DNA池文件: {out_dna_path}")
             continue
         DNA_pool = json.load(open(out_dna_path, "r", encoding="utf-8"))
         block_num = coding_config['files'][file_id]['segmentation']['block_num']
         for i in range(block_num):
             chunk_key = f'chunk_{i}'
             if chunk_key not in DNA_pool:
-                st.error(f"Missing {chunk_key} in {out_dna_path}")
+                st.error(f"{out_dna_path} 中缺少 {chunk_key}")
                 out_dna_pool = []
                 break
             out_dna_pool.append(DNA_pool[chunk_key])
@@ -331,9 +331,9 @@ elif st.session_state['mode'] == 'Restore from DNA':
         loaded_file_ids.append(file_id)
     out_file_ids = loaded_file_ids
     if not out_file_ids:
-        st.warning("No valid DNA pool data available for restoration.")
+        st.warning("没有可用于恢复的有效DNA池数据。")
         st.stop()
-    f"Loaded {strands_num} strands of length {chunk_size} nts"
+    st.info(f"已加载 {strands_num} 条长度为 {chunk_size} nts 的DNA序列用于恢复。")
 
     def infer_inner2_n_from_pool(dna_pool, cfg):
         inner1_n = cfg['ECC']['inner1']['n']
@@ -379,22 +379,22 @@ elif st.session_state['mode'] == 'Restore from DNA':
         configured_n2 = file_cfg['ECC']['inner2']['n']
         if inferred_n2 != configured_n2:
             st.warning(
-                f"{file_cfg['files'][file_id]['file_name']}: detected inner2.n={inferred_n2} from DNA pool, "
-                f"overriding configured {configured_n2} for restore compatibility."
+                f"{file_cfg['files'][file_id]['file_name']}: 从DNA池检测到 inner2.n={inferred_n2}，"
+                f"为恢复兼容性已覆盖配置值 {configured_n2}。"
             )
             file_cfg['ECC']['inner2']['n'] = inferred_n2
         restore_configs.append(file_cfg)
 
     if legacy_data_only_files:
         st.error(
-            "Cannot restore legacy DNA pool format missing BCH index bits: "
+            "无法恢复缺少BCH索引位的旧版DNA池格式: "
             + ", ".join(legacy_data_only_files)
-            + ". Please re-encode these files with the updated pipeline, then restore again."
+            + "。请使用更新后的流程重新编码这些文件，然后再恢复。"
         )
         st.stop()
 
     #================= DNA to Binary ====================#
-    'Converting DNA to Binary data...'
+    st.info('正在转换DNA为二进制数据...')
     temp = []
     for i, pool in enumerate(DNA_Library): # 提取出已选择的文件对应的DNA池，并转换为二进制数据
         out_data_pool = DNA_pool_to_binary_pool(restore_configs[i], pool)
@@ -408,7 +408,7 @@ elif st.session_state['mode'] == 'Restore from DNA':
     print('Number of pools:', len(Library))
     print('Number of blocks in each pool:', [len(pool) for pool in Library])
 
-    'Processing decode...'
+    st.info('正在译码..')
     print('Voting and decoding...')
     Prob_Library = [] # Store the voting results for each pool
     for i, pool in enumerate(Library):
@@ -451,7 +451,7 @@ elif st.session_state['mode'] == 'Restore from DNA':
 
     print('LDPC decoding completed.')
 
-    'Reconstructing the files...'
+    st.info('正在重建文件...')
     # Read decoded output to reconstruct the image
 
     # Read the config file to obtain the configuration.
@@ -495,7 +495,7 @@ elif st.session_state['mode'] == 'Restore from DNA':
         
         try:
             img = Image.open(out_file_path)
-            st.image(img, caption="Restored Image", width=200)
+            st.image(img, caption="恢复的图像", width=400)
             st.success(f"图像 '{file_name}' 提取成功，已保存到 {out_file_path}")
         except Exception as e:
             st.error(f"图像 '{file_name}' 提取失败: {e}")

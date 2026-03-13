@@ -3,174 +3,201 @@ description: COPDS simulation platform context and coding rules for accurate LLM
 applyTo: "**/*"
 ---
 
-# COPDS Project Instruction (Simulation Platform with UI)
+# COPDS Project Instruction (Updated)
 
-## 1) Project mission
+## 1) Project purpose
 
-This project is an interactive **demonstration platform** for DNA data storage simulation.
+COPDS is a Streamlit demo platform for DNA data storage simulation:
+- encode image files into DNA strands,
+- simulate DNA storage/sequencing channel effects,
+- decode and reconstruct the original image.
 
-Core goal:
-- Encode uploaded images into DNA strands.
-- Simulate DNA storage channel errors.
-- Decode and restore images from simulated DNA data.
+Priority order:
+1. End-to-end correctness.
+2. Compatibility with existing artifacts and config structure.
+3. Stable Streamlit behavior.
+4. Readability and maintainability.
 
-This is not a production backend service; prioritize:
-- Correct end-to-end behavior.
-- Stable Streamlit UX.
-- Reproducible intermediate artifacts.
+This is a demo/research workflow, not a production service.
 
-## 2) Current scope and product position
+## 2) Scope
 
 ### In scope
-- Image files only (`jpg`, `jpeg`, `png`).
-- Streamlit-based encode/restore workflow.
-- Two-layer BCH + outer LDPC pipeline.
-- DNA channel simulation (synthesis, decay, PCR, sequencing).
+- Image files only: `jpg`, `jpeg`, `png`.
+- Streamlit encode/restore workflow.
+- Outer 16-ary LDPC + inner BCH pipeline.
+- DNA channel simulation: synthesis, decay, PCR, sequencing.
+- Reproducible intermediate files in project folders.
 
-### Out of scope (unless user explicitly asks)
-- General arbitrary binary file support.
-- Major UI redesign.
-- Full architecture rewrite.
+### Out of scope unless explicitly requested
+- Arbitrary binary file support.
+- Large UI redesign.
+- Major architecture rewrite.
 
-## 3) Technology and runtime constraints
+## 3) Runtime and environment facts
 
-- Language: Python (main orchestration/UI).
-- UI framework: Streamlit.
-- Numeric stack: NumPy, SciPy ecosystem.
-- Visualization: Plotly / Matplotlib / Seaborn.
-- Current codec backend: FFTQSPA C++/pybind11 extension under `Encode/Nonbinary/`.
+- Main language: Python.
+- UI: Streamlit.
+- Core backend: `Encode/Nonbinary/fftqspa` pybind11/C++ extension.
+- Verified working environment in this repo: Python 3.12 virtual environment.
+- For Python 3.12, the compiled extension should be `Encode/Nonbinary/fftqspa.cp312-win_amd64.pyd`.
+- If the extension import fails, rebuild under `Encode/Nonbinary/` using the active environment.
+- Required Python build/runtime dependencies discovered in this session: `setuptools`, `pybind11`.
 
-Important roadmap direction:
-- Keep the FFTQSPA extension working (prebuilt `.pyd` and local build support).
-- Prefer modular changes that make it easy to **swap codec components behind Python adapters**.
-- Do not break existing interfaces while migrating.
+Important:
+- Do not hard-code a `cp311` extension path in new logic.
+- Prefer version-aware module path generation when metadata must be written to config.
 
-## 4) Entry points and important modules
+## 4) Main files and roles
 
-- `Webapp.py`: main Streamlit app, mode switch (`Encode & Store in DNA` / `Restore from DNA`).
-- `Helper_Functions.py`: data transforms, segmentation, DNA conversion, voting, codec wrappers.
-- `Encode/Nonbinary/`: FFTQSPA codec sources, parity/mapping files, and Python extension.
-- `Model/Model.py`: DNA channel simulation modules.
-- `Model/config.py`: default channel parameters and substitution transition matrices.
-- `config/config.json`: persistent coding metadata for stored files.
-- `DNA_Library/`: generated DNA pools (`*_in.dna`, `*_out.dna`).
-- `Mid_data/`: intermediate files for BCH/LDPC encode/decode IO.
-- `Restored_files/`: reconstructed output files.
+- `Webapp.py`: Streamlit entry point and encode/restore orchestration.
+- `Helper_Functions.py`: segmentation, DNA/binary transforms, BCH/LDPC wrappers, voting helpers.
+- `Encode/Nonbinary/`: FFTQSPA codec sources, parity files, mapping files, compiled extension.
+- `Model/Model.py`: DNA channel simulation.
+- `Model/config.py`: default channel parameters and substitution matrices.
+- `config/config.json`: persistent metadata for stored files and current ECC settings.
+- `DNA_Library/`: `{file_id}_in.dna`, `{file_id}_out.dna`.
+- `Mid_data/`: intermediate BCH/LDPC text files.
+- `Restored_files/`: restored output files.
+- `Analysis/e2e_run_default_jpg.py`: end-to-end validation script added during this session.
 
-## 5) End-to-end data flow (must stay consistent)
+## 5) Canonical pipeline
 
 ### Encode path
-1. Upload one or more images from Streamlit.
-2. Split image bytes into fixed-size chunks (`chunk_size / 8` bytes each).
-3. Convert bytes to bit strings.
-4. Group chunks into blocks of size `k_0`.
-5. Outer 16-ary LDPC encode per block (FFTQSPA).
-6. Inner BCH encode (index + payload) via FFTQSPA bindings.
-7. Convert binary codewords to DNA sequences.
-8. Save pre-channel DNA pools to `DNA_Library/*_in.dna`.
-9. Run channel simulation and save post-channel pools to `DNA_Library/*_out.dna`.
-10. Persist metadata to `config/config.json`.
+1. User selects mode `Encode & Store in DNA`.
+2. User uploads images and submits.
+3. Each image is split by raw file bytes into chunks of `chunk_size / 8` bytes.
+4. Chunks are converted to bit strings.
+5. Chunks are grouped into pools of size `k_0`; the final pool is padded with random bit chunks.
+6. Pools are transposed for inter-oligo LDPC encoding.
+7. Outer LDPC encodes each row.
+8. BCH encodes both index part and LDPC payload part.
+9. The full BCH codeword (`index + data`) is converted to DNA.
+10. Pre-channel DNA is saved to `DNA_Library/{file_id}_in.dna`.
+11. DNA channel simulation runs.
+12. Simulated DNA is saved to `DNA_Library/{file_id}_out.dna`.
+13. Metadata is merged into `config/config.json`.
 
 ### Restore path
-1. Load selected file metadata from `config/config.json`.
-2. Load corresponding `*_out.dna` pools.
-3. Convert DNA back to binary (split index/info/counts).
-4. BCH decode + voting (C++ fast path) to build probability matrix.
-5. LDPC decode using P(bit=0).
-7. Reassemble chunks and remove padding.
-8. Write restored files to `Restored_files/` and display images.
+1. User selects mode `Restore from DNA`.
+2. User selects stored file(s) and submits.
+3. App loads `config/config.json` and `{file_id}_out.dna`.
+4. DNA is converted back into binary arrays: `[ids, info, counts]`.
+5. BCH decode + voting (`bch_decode_and_vote_cpp`) produces LDPC input probabilities.
+6. LDPC decode reconstructs original chunk bits.
+7. Chunks are converted back to bytes.
+8. Padding chunks and final-byte padding are removed.
+9. Restored file is written to `Restored_files/`.
 
-## 6) Data contracts (critical)
+## 6) Critical data contracts
 
-### `config/config.json` minimum structure
-Must preserve keys and nesting:
+### `config/config.json`
+Must preserve this structure:
 - `file_num`
-- `files` (map: `file_id -> file metadata`)
-  - `file_name`, `file_type`, `suffix`, `file_size`
-  - `segmentation.chunk_num`, `segmentation.block_num`, `segmentation.pad_size`
-- `ECC.outer` (`n`, `k`, `h_matrix_path`, `ldpc_encoder_exe`, `parity_path`, `mapping_path`, `max_iter`, `code_ary`)
-- `ECC.inner1` (`n`, `k`)
-- `ECC.inner2` (`n`, `k`)
+- `files`
+	- `{file_id}`
+		- `file_name`
+		- `file_type`
+		- `suffix`
+		- `file_size`
+		- `segmentation.chunk_num`
+		- `segmentation.block_num`
+		- `segmentation.pad_size`
+- `ECC.outer`
+	- `n`, `k`, `h_matrix_path`, `ldpc_encoder_exe`, `parity_path`, `mapping_path`, `max_iter`, `code_ary`
+- `ECC.inner1`
+	- `n`, `k`
+- `ECC.inner2`
+	- `n`, `k`
 - `ECC.BCH_codec_exe`
-- `DNA2Binary.is_padding`, `DNA2Binary.padding`
+- `DNA2Binary.is_padding`
+- `DNA2Binary.padding`
 
-### DNA library file naming
-- Input pool: `{file_id}_in.dna`
-- Simulated output pool: `{file_id}_out.dna`
+### File naming
+- Input DNA pool: `{file_id}_in.dna`
+- Simulated DNA pool: `{file_id}_out.dna`
+- Mid data files use `{file_id}` with LDPC/BCH stage suffixes.
 
-### Mid data naming (do not change lightly)
-- LDPC encode/decode and BCH encode/decode files use `{file_id}` + block/chunk indices.
-- Any migration must keep backward compatibility or include explicit conversion logic.
+### DNA pool format
+- Current valid encode output uses full BCH codewords, not payload-only DNA.
+- `*_out.dna` is JSON where each key is `chunk_{block_id}` and each value is a dictionary:
+	- key: DNA sequence string
+	- value: count
 
-## 7) LLM coding rules for this repository
+### `_in.dna` writing rule
+- Write a single valid JSON object, not multiple JSON fragments appended to one file.
 
-1. **Preserve pipeline compatibility first**.
-	- Do not rename core config keys, file naming conventions, or directory contracts.
+## 7) Fixed parameters in current UI flow
 
-2. **Prefer small, surgical edits**.
-	- Avoid broad refactors unless explicitly requested.
+These are effectively fixed in the Streamlit app:
+- Outer LDPC: $(n_0, k_0) = (2048, 1024)$
+- Inner BCH index: $(n_1, k_1) = (29, 14)$
+- Inner BCH payload: $(n_2, k_2) = (419, 320)$ for current standard pipeline
+- Parity file: `Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat`
+- Mapping file: `Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt`
 
-3. **Use path-safe logic**.
-	- Prefer project-relative paths with `os.path.join`.
-	- Avoid introducing new hard-coded absolute paths.
+Decoder expectation:
+- LDPC decode consumes $P(bit=0)$ probabilities.
+- Probabilities should be clipped away from exactly 0 and 1.
 
-4. **Keep Streamlit interactions stable**.
-	- Retain mode switch behavior and basic form flow.
-	- Do not add unrelated UI complexity.
+## 8) Verified fixes from this session
 
-5. **Guard edge cases for robustness**.
-	- Empty upload list.
-	- Missing config entries.
-	- Missing DNA files.
-	- Padding handling in final chunk.
+These points reflect the current known-good behavior and should not be regressed:
 
-6. **Design for codec migration (Python + C++)**.
-	- Isolate codec calls behind clear interfaces.
-	- Keep adapter-like boundaries so the FFTQSPA backend can be swapped incrementally.
+1. **Streamlit startup works** under the current `.venv`.
+2. **`file_uploader` state bug fixed**: do not mutate `st.session_state["file_uploader"]` after widget creation.
+3. **Encode/restore actions must be submit-gated**: do not run full encode/decode on every rerun.
+4. **Config merge behavior fixed**: do not overwrite `config/config.json` before merging file records.
+5. **DNA conversion root-cause fixed**: DNA must be generated from full BCH output (`index + data`), not payload-only BCH text.
+6. **LDPC decode output orientation fixed**: do not transpose decoded rows before writing restore-stage output.
+7. **DNA count aggregation fixed**: repeated simulated DNA sequences must accumulate counts.
+8. **Restore multi-file chunk contamination fixed**: reset decoded chunk buffers per file.
+9. **Missing file/missing chunk guards added**.
 
-7. **Maintain existing output artifacts**.
-	- Keep generated files in `DNA_Library/`, `Mid_data/`, and `Restored_files/` unless task requires otherwise.
+## 9) Legacy compatibility warning
 
-## 8) Preferred implementation style
+Some historical DNA pools in `DNA_Library/` are not decodable with the corrected pipeline because they were generated by the old broken encode path.
 
-- Keep functions cohesive and single-purpose.
-- Use explicit variable names (avoid one-letter names unless mathematically standard).
-- Add docstrings for new non-trivial functions.
-- Log/print concise progress at critical stages (encode, channel, decode).
-- Keep bilingual comments only when necessary; prefer concise English technical wording.
+Known cause:
+- old DNA pools may contain only BCH payload bits and miss BCH index bits.
 
-## 9) Validation checklist for code changes
+Rule:
+- if a historical pool is detected as legacy payload-only format, do not silently decode it;
+- show a clear error and require re-encoding with the fixed pipeline.
 
-When changing encode/decode logic, verify:
-- Streamlit app starts successfully.
-- Encode path can produce `*_in.dna` and `*_out.dna`.
-- Restore path can reconstruct at least one previously encoded image.
+Concrete example from this session:
+- historical `Fruits.jpg` pool is legacy/incompatible and must be re-encoded.
+
+## 10) End-to-end validation result from this session
+
+Verified successfully:
+- `Test_Files/default.jpg` was re-encoded and restored end-to-end.
+- Restored file matched the source exactly by SHA256.
+
+Validation script:
+- `Analysis/e2e_run_default_jpg.py`
+
+Use that script as the fastest known-good non-UI regression check.
+
+## 11) Coding rules for future edits
+
+1. Prefer small, surgical changes.
+2. Preserve config keys, file names, and intermediate file contracts.
+3. Use project-relative paths.
+4. Do not introduce hard-coded external absolute paths.
+5. Keep Streamlit flow simple and stable.
+6. When changing encode/decode logic, validate with an end-to-end run.
+7. Keep FFTQSPA integration working; do not break `Encode/Nonbinary/` import/build.
+8. When touching restoration logic, consider both current correct pools and legacy broken pools.
+
+## 12) Minimal validation checklist
+
+After encode/decode changes, verify:
+- Streamlit app launches.
+- FFTQSPA imports correctly.
+- Encode produces valid `*_in.dna` and `*_out.dna`.
+- Restore reconstructs at least one newly encoded image successfully.
 - `config/config.json` remains parseable and contract-compatible.
-- No breaking change to BCH/LDPC IO file format unless explicitly planned.
-- FFTQSPA extension import works from `Encode/Nonbinary/`.
+- `Analysis/e2e_run_default_jpg.py` still succeeds.
 
-## 12) Fixed code parameters (current)
-
-These parameters are fixed in the Streamlit UI to match the FFTQSPA 16-ary LDPC setup:
-- Outer LDPC: $(n_0, k_0) = (2048, 1024)$ with parity file `Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat`.
-- Mapping file: `Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt`.
-- Inner BCH: $k_1=14$, $r_1=15$; $k_2=320$, $r_2=99$.
-- Decoder expects $P(bit=0)$ probabilities (clip away from 0/1).
-
-## 10) Priority order for decision making
-
-When requirements conflict, follow this order:
-1. End-to-end correctness of encode/restore pipeline.
-2. Compatibility with existing data/config/artifacts.
-3. Stability of Streamlit user flow.
-4. Readability and maintainability.
-5. Performance optimization.
-
-## 11) What the LLM should ask before large changes
-
-Before major modifications, clarify:
-- Whether change targets demo stability or migration toward Python/C++ codecs.
-- Whether backward compatibility with existing `DNA_Library` and `config/config.json` is required.
-- Whether scope is UI-only, algorithm-only, or both.
-
-If user intent is unclear, default to minimal compatible changes.
+If intent is unclear, default to minimal compatible changes.

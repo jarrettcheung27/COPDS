@@ -1,5 +1,5 @@
 {
-    "file_num": 2,
+    "file_num": 5,
     "files": {
         "fffe5d65-1ba8-4204-8ba7-ab0cdf359427": {
             "file_name": "Fruits.jpg",
@@ -21,6 +21,39 @@
                 "chunk_num": 2636,
                 "block_num": 3,
                 "pad_size": 12
+            }
+        },
+        "929b337c-4ab1-4728-a93c-ec7a7ae48dc1": {
+            "file_name": "cameraman - 1.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 12170,
+            "segmentation": {
+                "chunk_num": 305,
+                "block_num": 1,
+                "pad_size": 30
+            }
+        },
+        "3ad4150e-2ef6-4041-a539-43202f41fd66": {
+            "file_name": "cameraman - 2.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 6764,
+            "segmentation": {
+                "chunk_num": 170,
+                "block_num": 1,
+                "pad_size": 36
+            }
+        },
+        "9c3c404e-765e-4f4d-99d2-2f3b644c0f32": {
+            "file_name": "cameraman - 3.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 9736,
+            "segmentation": {
+                "chunk_num": 244,
+                "block_num": 1,
+                "pad_size": 24
             }
         }
     },
