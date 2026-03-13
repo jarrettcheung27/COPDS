@@ -1,7 +1,7 @@
 {
-    "file_num": 1,
+    "file_num": 2,
     "files": {
-        "cbafb8aa-a18b-4171-8e7e-d1f81c9bcf3f": {
+        "fffe5d65-1ba8-4204-8ba7-ab0cdf359427": {
             "file_name": "Fruits.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -11,24 +11,42 @@
                 "block_num": 2,
                 "pad_size": 32
             }
+        },
+        "8940f8e0-4132-43c3-9c98-a42cdc9da894": {
+            "file_name": "default.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 105428,
+            "segmentation": {
+                "chunk_num": 2636,
+                "block_num": 3,
+                "pad_size": 12
+            }
         }
     },
     "ECC": {
         "outer": {
             "n": 2048,
             "k": 1024,
-            "h_matrix_path": "./config/Hmatrix.txt",
-            "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
+            "h_matrix_path": "./Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat",
+            "ldpc_encoder_exe": "./Encode/Nonbinary/fftqspa.cp312-win_amd64.pyd",
+            "parity_path": "./Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat",
+            "mapping_path": "./Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt",
+            "max_iter": 50,
+            "code_ary": 16
         },
         "inner1": {
-            "n": 26,
-            "k": 11
+            "n": 29,
+            "k": 14
         },
         "inner2": {
             "n": 419,
             "k": 320
         },
-        "BCH_codec_exe": "./Encode/BCH_Codec.exe"
+        "BCH_codec_exe": "./Encode/Nonbinary/fftqspa.cp312-win_amd64.pyd"
     },
-    "DNA2Binary": {}
+    "DNA2Binary": {
+        "is_padding": false,
+        "padding": 0
+    }
 }

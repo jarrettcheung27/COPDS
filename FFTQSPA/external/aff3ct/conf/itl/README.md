@@ -1,1 +1,0 @@
-Interlever lookup table.

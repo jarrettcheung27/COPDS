@@ -1,1 +1,0 @@
-Messages (information bits) dumped from AFF3CT.

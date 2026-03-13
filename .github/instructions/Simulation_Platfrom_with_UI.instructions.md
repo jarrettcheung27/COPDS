@@ -38,17 +38,18 @@ This is not a production backend service; prioritize:
 - UI framework: Streamlit.
 - Numeric stack: NumPy, SciPy ecosystem.
 - Visualization: Plotly / Matplotlib / Seaborn.
-- Current codec backend: external executables under `Encode/` (e.g., LDPC/BCH).
+- Current codec backend: FFTQSPA C++/pybind11 extension under `Encode/Nonbinary/`.
 
 Important roadmap direction:
-- Keep current executable-based pipeline working.
-- Prefer modular changes that make it easy to **gradually replace codec components with Python + C++ implementations**.
+- Keep the FFTQSPA extension working (prebuilt `.pyd` and local build support).
+- Prefer modular changes that make it easy to **swap codec components behind Python adapters**.
 - Do not break existing interfaces while migrating.
 
 ## 4) Entry points and important modules
 
 - `Webapp.py`: main Streamlit app, mode switch (`Encode & Store in DNA` / `Restore from DNA`).
 - `Helper_Functions.py`: data transforms, segmentation, DNA conversion, voting, codec wrappers.
+- `Encode/Nonbinary/`: FFTQSPA codec sources, parity/mapping files, and Python extension.
 - `Model/Model.py`: DNA channel simulation modules.
 - `Model/config.py`: default channel parameters and substitution transition matrices.
 - `config/config.json`: persistent coding metadata for stored files.
@@ -63,8 +64,8 @@ Important roadmap direction:
 2. Split image bytes into fixed-size chunks (`chunk_size / 8` bytes each).
 3. Convert bytes to bit strings.
 4. Group chunks into blocks of size `k_0`.
-5. Outer LDPC encode per block.
-6. Inner BCH encode (index + payload).
+5. Outer 16-ary LDPC encode per block (FFTQSPA).
+6. Inner BCH encode (index + payload) via FFTQSPA bindings.
 7. Convert binary codewords to DNA sequences.
 8. Save pre-channel DNA pools to `DNA_Library/*_in.dna`.
 9. Run channel simulation and save post-channel pools to `DNA_Library/*_out.dna`.
@@ -74,9 +75,8 @@ Important roadmap direction:
 1. Load selected file metadata from `config/config.json`.
 2. Load corresponding `*_out.dna` pools.
 3. Convert DNA back to binary (split index/info/counts).
-4. BCH decode index and payload.
-5. Vote by index to build probability matrix.
-6. LDPC decode.
+4. BCH decode + voting (C++ fast path) to build probability matrix.
+5. LDPC decode using P(bit=0).
 7. Reassemble chunks and remove padding.
 8. Write restored files to `Restored_files/` and display images.
 
@@ -88,7 +88,7 @@ Must preserve keys and nesting:
 - `files` (map: `file_id -> file metadata`)
   - `file_name`, `file_type`, `suffix`, `file_size`
   - `segmentation.chunk_num`, `segmentation.block_num`, `segmentation.pad_size`
-- `ECC.outer` (`n`, `k`, `h_matrix_path`, `ldpc_encoder_exe`)
+- `ECC.outer` (`n`, `k`, `h_matrix_path`, `ldpc_encoder_exe`, `parity_path`, `mapping_path`, `max_iter`, `code_ary`)
 - `ECC.inner1` (`n`, `k`)
 - `ECC.inner2` (`n`, `k`)
 - `ECC.BCH_codec_exe`
@@ -126,7 +126,7 @@ Must preserve keys and nesting:
 
 6. **Design for codec migration (Python + C++)**.
 	- Isolate codec calls behind clear interfaces.
-	- Keep adapter-like boundaries so executable backends can be swapped incrementally.
+	- Keep adapter-like boundaries so the FFTQSPA backend can be swapped incrementally.
 
 7. **Maintain existing output artifacts**.
 	- Keep generated files in `DNA_Library/`, `Mid_data/`, and `Restored_files/` unless task requires otherwise.
@@ -147,6 +147,15 @@ When changing encode/decode logic, verify:
 - Restore path can reconstruct at least one previously encoded image.
 - `config/config.json` remains parseable and contract-compatible.
 - No breaking change to BCH/LDPC IO file format unless explicitly planned.
+- FFTQSPA extension import works from `Encode/Nonbinary/`.
+
+## 12) Fixed code parameters (current)
+
+These parameters are fixed in the Streamlit UI to match the FFTQSPA 16-ary LDPC setup:
+- Outer LDPC: $(n_0, k_0) = (2048, 1024)$ with parity file `Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat`.
+- Mapping file: `Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt`.
+- Inner BCH: $k_1=14$, $r_1=15$; $k_2=320$, $r_2=99$.
+- Decoder expects $P(bit=0)$ probabilities (clip away from 0/1).
 
 ## 10) Priority order for decision making
 

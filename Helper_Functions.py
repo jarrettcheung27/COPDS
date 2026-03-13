@@ -11,6 +11,11 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from Analysis.Analysis import dna_chunk, plot_oligo_number_distribution, plot_error_distribution
 import pdb # python debugger
+from Encode.Nonbinary import fftqspa
+
+
+def bits_from_string(bit_string):
+    return np.array([1 if ch == '1' else 0 for ch in bit_string.strip()], dtype=np.uint8)
 # from Sequencing_Cost_Optimization_Analy.Crossover_Prob import Optimal_Allocation_InnerCode
 
 
@@ -439,15 +444,9 @@ def binary_to_dna_pools(data_pools, dna_length, is_padding,dna_pool_filename):
     # ------------ Save DNAs to files --------------- #
     # Check if the directory exists, if not, create it
 
-    for idx, dnas in enumerate(dna_pools):
-        if idx == 0:
-            with open(dna_pool_filename, "w") as file:
-                # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
-                json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
-        else:
-            with open(dna_pool_filename, "a") as file: # 后续的block 使用追加写入
-                # Append DNA sequences to the existing file
-                json.dump({f"block_{idx}": dnas}, file, ensure_ascii=False, indent=2)
+    json_payload = {f"block_{idx}": dnas for idx, dnas in enumerate(dna_pools)}
+    with open(dna_pool_filename, "w", encoding="utf-8") as file:
+        json.dump(json_payload, file, ensure_ascii=False, indent=2)
     return dna_pools
 
 def DNA_pool_to_binary_pool(coding_config, dna_pool):
@@ -588,7 +587,9 @@ def extract_dnas(out_dnas):
     for dna_set in out_dnas:
         for dna_error_profile in dna_set['re']:# Only obtian the DNA don't loss 
                 if dna_error_profile[0] != 0: # 
-                    result[dna_error_profile[2]] = dna_error_profile[0]
+                    dna_seq = dna_error_profile[2]
+                    dna_count = dna_error_profile[0]
+                    result[dna_seq] = result.get(dna_seq, 0) + dna_count
     return result
 
 
@@ -634,12 +635,33 @@ class LDPC_Codec:
         :param coding_config: Configuration for the coding process
         :param mid_data_folder: Folder for intermediate data files
         """
-        self.h_matrix = coding_config["ECC"]["outer"]["h_matrix_path"]
-        self.LDPC_codec_path = coding_config["ECC"]["outer"]["ldpc_encoder_exe"]
+        self.h_matrix = coding_config["ECC"]["outer"].get("h_matrix_path", "")
+        self.LDPC_codec_path = coding_config["ECC"]["outer"].get("ldpc_encoder_exe", "")
+        self.parity_path = coding_config["ECC"]["outer"].get(
+            "parity_path",
+            "./Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat",
+        )
+        self.mapping_path = coding_config["ECC"]["outer"].get(
+            "mapping_path",
+            "./Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt",
+        )
+        self.max_iter = coding_config["ECC"]["outer"].get("max_iter", 50)
+        self.codec = fftqspa.BCJRQSPA(self.parity_path, self.max_iter, self.mapping_path)
+        self.info_len = int(self.codec.info_bits_len())
+        self.code_len = int(self.codec.code_bits_len())
         self.mid_data_folder = mid_data_folder # folder for mid data
         if not os.path.exists(self.mid_data_folder):
             os.makedirs(self.mid_data_folder)
             print("Created directory:", self.mid_data_folder)
+
+    def _bits_from_string(self, bit_string):
+        return bits_from_string(bit_string)
+
+    def _write_bitstrings(self, path, bit_rows):
+        with open(path, "w", encoding="utf-8") as f:
+            for row in bit_rows:
+                f.write("".join(str(int(x)) for x in row))
+                f.write("\n")
 
     def encode(self, pool, file_id):
         """
@@ -649,7 +671,6 @@ class LDPC_Codec:
         - pool: List of pools, each pool is a list of bit strings (chunks)
         - file_id: ID of the file being processed
         """
-        mode = "encode"
         for block_id, block in enumerate(pool):
             # Prepare input file path
             input_file = self.mid_data_folder + f"{file_id}_LDPC_encode_in_{block_id}.txt"
@@ -657,11 +678,14 @@ class LDPC_Codec:
                 for chunk in block:
                     f.write(chunk + "\n")
             output_file = self.mid_data_folder + f"{file_id}_LDPC_encode_out_{block_id}.txt"
-            # Call LDPC decoder executable
-            mode = "encode"
-            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], capture_output=True, text=True)
-            # print(result.stdout)  # Print the output from the LDPC decoder
-            print(result.stderr)  # Print any error messages from the LDPC decoder
+            code_rows = []
+            for line in block:
+                info_bits = self._bits_from_string(line)
+                if info_bits.size != self.info_len:
+                    raise ValueError(f"LDPC info length mismatch: expected {self.info_len}, got {info_bits.size}")
+                code_bits = self.codec.encoder4bibo(info_bits.astype(np.int32))
+                code_rows.append(code_bits)
+            self._write_bitstrings(output_file, code_rows)
 
     def decode(self, out_prob_pools,file_id):
         """
@@ -674,14 +698,28 @@ class LDPC_Codec:
         for chunk_id, v_score in enumerate(out_prob_pools):
             input_file = self.mid_data_folder + f"{file_id}_LDPC_decode_in_{chunk_id}.txt"
             output_file = self.mid_data_folder + f"{file_id}_LDPC_decode_out_{chunk_id}.txt"
+            v_score = np.asarray(v_score, dtype=np.float64)
+            np.savetxt(input_file, v_score, fmt="%.6f", delimiter=" ")
 
-            np.savetxt(input_file, v_score, fmt="%.3f", delimiter=" ")
-            # Call LDPC decoder executable
-            print('The size of current vscore is:', v_score.shape)
-            mode = "decode"
-            result = subprocess.run([self.LDPC_codec_path, mode, input_file, output_file, self.h_matrix], check=True, text=True)
-            print(result.stdout)  # Print the output from the LDPC decoder
-            print(result.stderr)  # Print any error messages from the LDPC decoder
+            rr_bits_prob = 1.0 - v_score
+            tie_mask = rr_bits_prob == 0.5
+            if np.any(tie_mask):
+                jitter = np.random.choice(np.array([-1.0, 1.0]), size=np.count_nonzero(tie_mask)) * 1e-6
+                rr_bits_prob[tie_mask] = 0.5 + jitter
+            epsilon = 0.05
+            rr_bits_prob = np.clip(rr_bits_prob, epsilon, 1 - epsilon)
+
+            decoded_rows = []
+            for row in rr_bits_prob:
+                if row.size != self.code_len:
+                    raise ValueError(f"LDPC code length mismatch: expected {self.code_len}, got {row.size}")
+                decoded_bits, _iter = self.codec.decode4bibo(row)
+                sys_start = self.code_len - self.info_len
+                info_bits = decoded_bits[sys_start:]
+                decoded_rows.append(info_bits)
+
+            decoded_matrix = np.array(decoded_rows, dtype=np.uint8)
+            self._write_bitstrings(output_file, decoded_matrix)
 
 def transpose_v2h(data_pools):
     """
@@ -721,17 +759,22 @@ class BCH_Codec:
         self.k2 = coding_config["ECC"]["inner2"]["k"]
         self.n2 = coding_config["ECC"]["inner2"]["n"]
         self.n0 = coding_config["ECC"]["outer"]["n"]
-        self.BCH_codec_path = coding_config["ECC"]["BCH_codec_exe"]
-        self.mid_data_folder = "D:/mycode/COPDS/Mid_data/"
-        self.config_path = "D:/mycode/COPDS/config/config.json"
-        # Call BCH decoder executable to encode ids in the initialization
-        ids  = np.array([int_to_binary_array(id, self.k1) for id in range(self.n0)],dtype = np.uint8).T
-        input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
+        self.BCH_codec_path = coding_config["ECC"].get("BCH_codec_exe", "")
+        self.mid_data_folder = "./Mid_data/"
+        self.config_path = "./config/config.json"
         self.output_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_out.txt")
-        np.savetxt(input_file_ids, ids, fmt="%d", delimiter="")
-        result = subprocess.run([self.BCH_codec_path, self.config_path, input_file_ids, self.output_file_ids, "encode"], capture_output=True, text=True, check=True)
-        # print(result.stdout)  # Print the output from the BCH decoder
-        print(result.stderr)  # Print any error messages from the BCH decoder
+
+        ids = np.array([int_to_binary_array(idx, self.k1) for idx in range(self.n0)], dtype=np.uint8)
+        input_file_ids = os.path.join(self.mid_data_folder, "ids_BCH_encode_in.txt")
+        self._write_bch_matrix(input_file_ids, ids.T)
+        encoded_ids = fftqspa.bch_encode(self.n1, self.k1, ids.astype(np.int32))
+        self._write_bch_matrix(self.output_file_ids, encoded_ids.T)
+
+    def _write_bch_matrix(self, path, matrix):
+        with open(path, "w", encoding="utf-8") as f:
+            for row in matrix:
+                f.write(",".join(str(int(x)) for x in row))
+                f.write("\n")
 
     def encode(self, file_id):
         '''
@@ -747,9 +790,13 @@ class BCH_Codec:
             # Encode information bit by BCH encoder.
             input_file = os.path.join(self.mid_data_folder, f"{file_id}_LDPC_encode_out_{block_id}.txt")
             output_file = os.path.join(self.mid_data_folder, f"{file_id}_BCH_encode_out_{block_id}.txt")
-            result = subprocess.run([self.BCH_codec_path, self.config_path, input_file, output_file, "encode"], capture_output=True, text=True)
-            # print(result.stdout)  # Print the output from the BCH decoder
-            print(result.stderr)  # Print any error messages from the BCH decoder
+            with open(input_file, "r", encoding="utf-8") as f:
+                data_rows = [bits_from_string(line) for line in f if line.strip()]
+            data_matrix = np.array(data_rows, dtype=np.uint8)
+            if data_matrix.shape[0] != self.k2:
+                raise ValueError(f"BCH data rows mismatch: expected {self.k2}, got {data_matrix.shape[0]}")
+            encoded_data = fftqspa.bch_encode(self.n2, self.k2, data_matrix.T.astype(np.int32))
+            self._write_bch_matrix(output_file, encoded_data.T)
     
             # Read each line and obtain the bits seperated by ','. each row is of length n_0.
             id_block = []
@@ -783,22 +830,22 @@ class BCH_Codec:
             output_file_id = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_id_out_{block_id}.txt")
             input_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_in_{block_id}.txt")
             output_file_info = os.path.join(self.mid_data_folder, f"{file_id}_BCH_decode_info_out_{block_id}.txt")
-            
-            # Decode id
-            result_id = subprocess.run([self.BCH_codec_path, self.config_path, input_file_id, output_file_id, "decode"], 
-                                       check=True, text=True)
-            # print(result_id.stdout)  # Print the output from the BCH decoder
-            # print(result_id.stderr)  # Print any error messages from the BCH decoder            
-            # Decode information part
-            result_info = subprocess.run([self.BCH_codec_path, self.config_path, input_file_info, output_file_info, "decode"],
-                                          check=True, text=True)
-            # print(result_info.stdout)  # Print the output from the BCH decoder
-            # print(result_info.stderr)  # Print any error messages from the BCH decoder
-            # Read each line and obtain the bits separated by ','. each row is of length n_0.
-            id_block = np.loadtxt(output_file_id, delimiter=',', dtype=np.uint8)
-            info_block = np.loadtxt(output_file_info, delimiter=',', dtype=np.uint8)
+            with open(input_file_id, "r", encoding="utf-8") as f:
+                id_rows = [bits_from_string(line.replace(",", "")) for line in f if line.strip()]
+            with open(input_file_info, "r", encoding="utf-8") as f:
+                info_rows = [bits_from_string(line.replace(",", "")) for line in f if line.strip()]
 
-            out_pool.append([id_block.T, info_block.T])
+            id_matrix = np.array(id_rows, dtype=np.uint8)
+            info_matrix = np.array(info_rows, dtype=np.uint8)
+            decoded_id = fftqspa.bch_decode(self.n1, self.k1, id_matrix.T.astype(np.int32))
+            decoded_info = fftqspa.bch_decode(self.n2, self.k2, info_matrix.T.astype(np.int32))
+
+            id_out = decoded_id[:, 1:].astype(np.uint8)
+            info_out = decoded_info[:, 1:].astype(np.uint8)
+            self._write_bch_matrix(output_file_id, id_out.T)
+            self._write_bch_matrix(output_file_info, info_out.T)
+
+            out_pool.append([id_out, info_out])
         return out_pool
     def pool_to_txt(self, pool, file_id):
         '''
@@ -910,6 +957,23 @@ def voting(block, coding_config):
         voting_result = np.zeros((chunk_size, n_0))
     voting_result = np.array(voting_result)
     return voting_result.T
+
+def bch_decode_and_vote_cpp(block, coding_config):
+    """
+    Decode BCH for index/data and vote using the FFTQSPA C++ implementation.
+    Counts are ignored to keep the C++ fast path.
+    """
+    n1 = coding_config["ECC"]["inner1"]["n"]
+    k1 = coding_config["ECC"]["inner1"]["k"]
+    n2 = coding_config["ECC"]["inner2"]["n"]
+    k2 = coding_config["ECC"]["inner2"]["k"]
+    n0 = coding_config["ECC"]["outer"]["n"]
+
+    rx_idx = np.asarray(block[0], dtype=np.int32)
+    rx_data = np.asarray(block[1], dtype=np.int32)
+
+    v_score = fftqspa.bch_decode_and_vote(n1, k1, n2, k2, n0, rx_idx, rx_data)
+    return v_score.T
 
 
 # ----------------------Webapp----------------------------#
