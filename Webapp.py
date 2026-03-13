@@ -24,18 +24,75 @@ warnings.filterwarnings("ignore")
 
 CONFIG_PATH = "./config/config.json"
 DNA_LIB_DIR = "./DNA_Library/"
-DEBUG_MODE = True
+DEBUG_MODE = False
+def load_config_or_default():
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            pass
+    return {"file_num": 0, "files": {}, "ECC": {}, "DNA2Binary": {}}
+
+def save_config(config_data):
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=4, ensure_ascii=False)
+
+def list_stored_files_ui():
+    coding_config = load_config_or_default()
+    files = coding_config.get("files", {})
+    if not files:
+        st.info("DNA库中没有已存储的文件。")
+        return
+    rows = []
+    total_blocks = 0
+    for file_id, info in files.items():
+        block_num = info.get("segmentation", {}).get("block_num", 0)
+        total_blocks += block_num
+        rows.append({
+            "DNA 池 id": file_id,
+            "文件名": info.get("file_name", ""),
+            "DNA 块数": block_num,
+        })
+    st.subheader("DNA库已存文件")
+    st.dataframe(rows, use_container_width=True)
+    st.info(f"总DNA块数（block_num）: {total_blocks}")
+
+def clear_dna_library():
+    os.makedirs(DNA_LIB_DIR, exist_ok=True)
+    removed = 0
+    for name in os.listdir(DNA_LIB_DIR):
+        if name.lower().endswith(".dna"):
+            file_path = os.path.join(DNA_LIB_DIR, name)
+            try:
+                os.remove(file_path)
+                removed += 1
+            except OSError:
+                continue
+    coding_config = load_config_or_default()
+    coding_config["file_num"] = 0
+    coding_config["files"] = {}
+    save_config(coding_config)
+    st.success(f"已清空DNA库，共删除 {removed} 个 .dna 文件，并更新配置。")
 
 if DEBUG_MODE:
     coding_config = json.load(open(CONFIG_PATH, "r"))
     file_ids = list(coding_config['files'].keys())
 # =========================== assigning parameters ========================= #
 print('Running Webapp...')
+
+if st.button("查询已存文件"):
+    list_stored_files_ui()
+
+if st.button("清空 DNA 库"):
+    st.warning("已执行清空DNA库操作，恢复功能将不再可用。")
+    clear_dna_library()
+
 with st.form(key="selectMode"): # key 是这个表单的标识符
-    st.session_state['mode'] = st.selectbox('模式', ['编码并存入DNA池', '从DNA池中读取并译码',])
+    st.session_state['mode'] = st.selectbox('模式', ['编码并存入 DNA 库', '从 DNA 库中读取并译码',])
     mode_submitted  = st.form_submit_button("提交")
 
-if st.session_state['mode'] == '编码并存入DNA池':
+if st.session_state['mode'] == '编码并存入 DNA 库':
     # ------------ Choosing parameters -------------- # 
     st.sidebar.subheader('编码参数')
     chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320, disabled=True)
@@ -50,8 +107,8 @@ if st.session_state['mode'] == '编码并存入DNA池':
     st.subheader('DNA数据存储信道参数')
     with st.form(key="channelParams"): # 创建一个表单
         # synthesis stage
+        arg.syn_sub_prob = st.slider('信道噪声水平', min_value = 0.01, max_value = 0.4, value = 0.01) / 3 # 3 kinds of errors
         arg.syn_number = st.slider('合成数量', min_value = 10, max_value = 50, value = 20)
-        # arg.syn_sub_prob = st.number_input('Syn Error rate', min_value = 0.0, max_value = 0.5, value = 0.00001) / 3 # 3 kinds of errors
         arg.syn_yield = st.slider('合成产率', min_value = 0.98, max_value = 0.9999, value = 0.9999)
 
         # PCR stage
@@ -266,9 +323,9 @@ if st.session_state['mode'] == '编码并存入DNA池':
             # Write DNA sequences as JSON: key is pool index, value is list of DNA sequences
             json.dump(out_pool, file, ensure_ascii=False, indent=2)
     print('Simulated DNAs saved to ', DNA_LIB_DIR)
-    st.success('文件已存入DNA池。')
+    st.success('文件已存入 DNA 库。')
 
-elif st.session_state['mode'] == '从DNA池中读取并译码':
+elif st.session_state['mode'] == '从 DNA 库中读取并译码':
         # ===================== Load the configuration file ===================== #
     config_path = "./config/config.json"
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -313,7 +370,7 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
         out_dna_pool = []
         out_dna_path = os.path.join(DNA_LIB_DIR, f"{file_id}_out.dna")
         if not os.path.exists(out_dna_path):
-            st.error(f"未找到DNA池文件: {out_dna_path}")
+            st.error(f"未找到 DNA 库文件: {out_dna_path}")
             continue
         DNA_pool = json.load(open(out_dna_path, "r", encoding="utf-8"))
         block_num = coding_config['files'][file_id]['segmentation']['block_num']
@@ -331,7 +388,7 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
         loaded_file_ids.append(file_id)
     out_file_ids = loaded_file_ids
     if not out_file_ids:
-        st.warning("没有可用于恢复的有效DNA池数据。")
+        st.warning("没有可用于恢复的有效 DNA 库数据。")
         st.stop()
     st.info(f"已加载 {strands_num} 条长度为 {chunk_size} nts 的DNA序列用于恢复。")
 
@@ -379,7 +436,7 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
         configured_n2 = file_cfg['ECC']['inner2']['n']
         if inferred_n2 != configured_n2:
             st.warning(
-                f"{file_cfg['files'][file_id]['file_name']}: 从DNA池检测到 inner2.n={inferred_n2}，"
+                f"{file_cfg['files'][file_id]['file_name']}: 从 DNA 库检测到 inner2.n={inferred_n2}，"
                 f"为恢复兼容性已覆盖配置值 {configured_n2}。"
             )
             file_cfg['ECC']['inner2']['n'] = inferred_n2
@@ -387,7 +444,7 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
 
     if legacy_data_only_files:
         st.error(
-            "无法恢复缺少BCH索引位的旧版DNA池格式: "
+            "无法恢复缺少BCH索引位的旧版 DNA 库格式: "
             + ", ".join(legacy_data_only_files)
             + "。请使用更新后的流程重新编码这些文件，然后再恢复。"
         )
@@ -396,7 +453,7 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
     #================= DNA to Binary ====================#
     st.info('正在转换DNA为二进制数据...')
     temp = []
-    for i, pool in enumerate(DNA_Library): # 提取出已选择的文件对应的DNA池，并转换为二进制数据
+    for i, pool in enumerate(DNA_Library): # 提取出已选择的文件对应的 DNA 库，并转换为二进制数据
         out_data_pool = DNA_pool_to_binary_pool(restore_configs[i], pool)
         temp.append(out_data_pool)
         print(out_data_pool[0][0].shape)
@@ -494,8 +551,8 @@ elif st.session_state['mode'] == '从DNA池中读取并译码':
                 f.write(chunk)
         
         try:
+            st.success(f"图像 '{file_name}' 提取成功，已保存到 {out_file_path}")
             img = Image.open(out_file_path)
             st.image(img, caption="恢复的图像", width=400)
-            st.success(f"图像 '{file_name}' 提取成功，已保存到 {out_file_path}")
         except Exception as e:
             st.error(f"图像 '{file_name}' 提取失败: {e}")

@@ -1,18 +1,7 @@
 {
-    "file_num": 5,
+    "file_num": 4,
     "files": {
-        "fffe5d65-1ba8-4204-8ba7-ab0cdf359427": {
-            "file_name": "Fruits.jpg",
-            "file_type": "image/jpeg",
-            "suffix": "jpg",
-            "file_size": 73968,
-            "segmentation": {
-                "chunk_num": 1850,
-                "block_num": 2,
-                "pad_size": 32
-            }
-        },
-        "8940f8e0-4132-43c3-9c98-a42cdc9da894": {
+        "0f382ecf-d027-43c1-9865-c809ec231406": {
             "file_name": "default.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -23,7 +12,7 @@
                 "pad_size": 12
             }
         },
-        "929b337c-4ab1-4728-a93c-ec7a7ae48dc1": {
+        "2d2b9212-ecfa-497d-b051-11681907e037": {
             "file_name": "cameraman - 1.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -34,7 +23,7 @@
                 "pad_size": 30
             }
         },
-        "3ad4150e-2ef6-4041-a539-43202f41fd66": {
+        "eacf4010-4e2d-4bc2-ae89-a3b93fa65ebc": {
             "file_name": "cameraman - 2.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -45,15 +34,15 @@
                 "pad_size": 36
             }
         },
-        "9c3c404e-765e-4f4d-99d2-2f3b644c0f32": {
-            "file_name": "cameraman - 3.jpg",
+        "52cbcd25-d4db-4c10-8859-ce4d4126f817": {
+            "file_name": "Fruits.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
-            "file_size": 9736,
+            "file_size": 73968,
             "segmentation": {
-                "chunk_num": 244,
-                "block_num": 1,
-                "pad_size": 24
+                "chunk_num": 1850,
+                "block_num": 2,
+                "pad_size": 32
             }
         }
     },
