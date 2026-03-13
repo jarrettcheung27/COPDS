@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore")
 
 CONFIG_PATH = "./config/config.json"
 DNA_LIB_DIR = "./DNA_Library/"
+MID_DATA_DIR = "./Mid_data/"
 DEBUG_MODE = False
 def load_config_or_default():
     if os.path.exists(CONFIG_PATH):
@@ -75,6 +76,19 @@ def clear_dna_library():
     save_config(coding_config)
     st.success(f"已清空DNA库，共删除 {removed} 个 .dna 文件，并更新配置。")
 
+def clear_mid_data():
+    os.makedirs(MID_DATA_DIR, exist_ok=True)
+    removed = 0
+    for name in os.listdir(MID_DATA_DIR):
+        file_path = os.path.join(MID_DATA_DIR, name)
+        if os.path.isfile(file_path):
+            try:
+                os.remove(file_path)
+                removed += 1
+            except OSError:
+                continue
+    return removed
+
 if DEBUG_MODE:
     coding_config = json.load(open(CONFIG_PATH, "r"))
     file_ids = list(coding_config['files'].keys())
@@ -88,6 +102,7 @@ if st.button("清空 DNA 库"):
     st.warning("已执行清空DNA库操作，恢复功能将不再可用。")
     clear_dna_library()
 
+st.subheader("选择模式")
 with st.form(key="selectMode"): # key 是这个表单的标识符
     st.session_state['mode'] = st.selectbox('模式', ['编码并存入 DNA 库', '从 DNA 库中读取并译码',])
     mode_submitted  = st.form_submit_button("提交")
@@ -322,6 +337,9 @@ if st.session_state['mode'] == '编码并存入 DNA 库':
             json.dump(out_pool, file, ensure_ascii=False, indent=2)
     print('Simulated DNAs saved to ', DNA_LIB_DIR)
     st.success('文件已存入 DNA 库。')
+    removed_mid_files = clear_mid_data()
+    # 给出DNA库的文件可跳转的文件夹绝对路径链接
+    st.markdown(f"DNA库路径: `{os.path.abspath(DNA_LIB_DIR)}`")
 
 elif st.session_state['mode'] == '从 DNA 库中读取并译码':
         # ===================== Load the configuration file ===================== #
@@ -554,3 +572,5 @@ elif st.session_state['mode'] == '从 DNA 库中读取并译码':
             st.image(img, caption="恢复的图像", width=400)
         except Exception as e:
             st.error(f"图像 '{file_name}' 提取失败: {e}")
+
+    removed_mid_files = clear_mid_data()
