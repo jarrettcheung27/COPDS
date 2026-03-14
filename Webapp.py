@@ -108,13 +108,13 @@ with st.form(key="selectMode"): # key 是这个表单的标识符
     mode_submitted  = st.form_submit_button("提交")
 # ------------ Choosing parameters -------------- # 
 st.sidebar.subheader('编码参数')
-chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320, disabled=True)
-k_0 = st.sidebar.number_input('外码信息位长度 $k_0$', min_value = 1024, max_value = 1024, value = 1024, disabled=True)
-n_0 = st.sidebar.number_input('外码码长 $n_0$', min_value = 2048, max_value = 2048, value = 2048, disabled=True)
-k_1 = st.sidebar.number_input('索引长度 $k_1$', min_value = 14, max_value = 14, value = 14, disabled=True)
-r_1 = st.sidebar.number_input('第一层TL-BCH冗余 $r_1$', min_value = 15, max_value = 15, value = 15, disabled=True)
+chunk_size = st.sidebar.number_input('数据分块大小', min_value = 320, max_value = 320, value = 320)
+k_0 = st.sidebar.number_input('外码信息位长度 $k_0$', min_value = 1024, max_value = 1024, value = 1024)
+n_0 = st.sidebar.number_input('外码码长 $n_0$', min_value = 2048, max_value = 2048, value = 2048)
+k_1 = st.sidebar.number_input('索引长度 $k_1$', min_value = 14, max_value = 14, value = 14)
+r_1 = st.sidebar.number_input('第一层TL-BCH冗余 $r_1$', min_value = 15, max_value = 15, value = 15)
 k_2 = chunk_size
-r_2 = st.sidebar.number_input('第二层TL-BCH冗余 $r_2$', min_value = 99, max_value = 99, value = 99, disabled=True)
+r_2 = st.sidebar.number_input('第二层TL-BCH冗余 $r_2$', min_value = 99, max_value = 99, value = 99)
 # --------------------Channel parameter----------------
 arg = config.DEFAULT_PASSER
 st.subheader('DNA数据存储信道参数')
