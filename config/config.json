@@ -1,7 +1,62 @@
 {
-    "file_num": 1,
+    "file_num": 6,
     "files": {
-        "f124bbf1-04c2-4bae-8c12-d1b8ffa6561e": {
+        "879c990c-e428-4525-9f9d-d70a72deba34": {
+            "file_name": "201310019348.0一种分组马尔可夫叠加编码方法_Page11.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 146186,
+            "segmentation": {
+                "chunk_num": 3655,
+                "block_num": 4,
+                "pad_size": 14
+            }
+        },
+        "3bbc23d3-4bb8-42aa-8db5-e7e90c527d84": {
+            "file_name": "201310019365.4一种具有不等错误保护的编码方法_Page9.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 112786,
+            "segmentation": {
+                "chunk_num": 2820,
+                "block_num": 3,
+                "pad_size": 14
+            }
+        },
+        "e32c1d5d-7c4a-4ea2-94e0-415e296a7241": {
+            "file_name": "201310019348.0一种分组马尔可夫叠加编码方法_Page10.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 95440,
+            "segmentation": {
+                "chunk_num": 2386,
+                "block_num": 3,
+                "pad_size": 0
+            }
+        },
+        "7aa2aff8-9fa5-4ef9-94e7-846e257d11b3": {
+            "file_name": "cameraman - 3.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 9736,
+            "segmentation": {
+                "chunk_num": 244,
+                "block_num": 1,
+                "pad_size": 24
+            }
+        },
+        "f8f50bb5-e64c-4e11-86b0-13de351f4304": {
+            "file_name": "default.jpg",
+            "file_type": "image/jpeg",
+            "suffix": "jpg",
+            "file_size": 105428,
+            "segmentation": {
+                "chunk_num": 2636,
+                "block_num": 3,
+                "pad_size": 12
+            }
+        },
+        "f953e4f2-59e5-488c-9c0d-0d4528022476": {
             "file_name": "Fruits.jpg",
             "file_type": "image/jpeg",
             "suffix": "jpg",
@@ -15,20 +70,27 @@
     },
     "ECC": {
         "outer": {
-            "n": 1334,
-            "k": 1000,
-            "h_matrix_path": "./config/Hmatrix.txt",
-            "ldpc_encoder_exe": "./Encode/LDPC_PEG-v2.0.exe"
+            "n": 2048,
+            "k": 1024,
+            "h_matrix_path": "./Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat",
+            "ldpc_encoder_exe": "./Encode/Nonbinary/fftqspa.cp312-win_amd64.pyd",
+            "parity_path": "./Encode/Nonbinary/Parity_files_2048/512_256_16aryCode17.dat",
+            "mapping_path": "./Encode/Nonbinary/Mapping_files/SignalSet_BPSK-4.txt",
+            "max_iter": 50,
+            "code_ary": 16
         },
         "inner1": {
-            "n": 26,
-            "k": 11
+            "n": 29,
+            "k": 14
         },
         "inner2": {
             "n": 419,
             "k": 320
         },
-        "BCH_codec_exe": "./Encode/BCH_Codec.exe"
+        "BCH_codec_exe": "./Encode/Nonbinary/fftqspa.cp312-win_amd64.pyd"
     },
-    "DNA2Binary": {}
+    "DNA2Binary": {
+        "is_padding": false,
+        "padding": 0
+    }
 }
