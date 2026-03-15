@@ -62,7 +62,7 @@ streamlit run Webapp.py
 ![模式选择截图](Snapshots/Storemode.JPG)
 ---
 2. 调整 DNA 信道参数，以模拟不同存储条件。
-![信道参数截图](Snapshots/Channelparams.jpg)
+![信道参数截图](Snapshots/Channelparams.JPG)
 ---
 3. 选择编码参数（当前固定为默认值）。
 ![编码参数截图](Snapshots/Codeparams.png)
